@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>你有多了解哥哥？</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    min-height: 100vh;
+    background: #0c0c14;
+    color: #e8e6e1;
+    font-family: Georgia, serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 28px 16px;
+  }
+
+  @keyframes fadeIn {
+    from { opacity:0; transform:translateY(14px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(201,169,119,0.25); }
+    50%      { box-shadow: 0 0 16px 3px rgba(201,169,119,0.1); }
+  }
+  @keyframes popIn {
+    from { opacity:0; transform:scale(0.6); }
+    to   { opacity:1; transform:scale(1); }
+  }
+  @keyframes shimmer {
+    0%   { background-position: -200% center; }
+    100% { background-position:  200% center; }
+  }
+
+  .tag {
+    font-size: 10px;
+    letter-spacing: 5px;
+    color: #c9a977;
+    opacity: 0.6;
+    margin-bottom: 6px;
+  }
+
+  .title {
+    font-size: 21px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    background: linear-gradient(90deg, #c9a977, #e8d5b0, #c9a977);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 3s linear infinite;
+  }
+
+  .subtitle {
+    font-size: 12px;
+    color: #555;
+    margin-bottom: 30px;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 400px;
+    animation: fadeIn 0.35s ease-out;
+  }
+
+  .progress-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 22px;
+  }
+
+  .progress-bar {
+    flex: 1;
+    height: 3px;
+    background: #1a1a24;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #c9a977, #ddc49e);
+    border-radius: 2px;
+    transition: width 0.5s ease;
+  }
+
+  .progress-label {
+    font-size: 12px;
+    color: #555;
+    min-width: 36px;
+    text-align: right;
+  }
+
+  .question {
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.8;
+    margin-bottom: 20px;
+    color: #f0ece4;
+  }
+
+  .options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .option {
+    padding: 13px 14px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.05);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #aaa8a0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .option:hover:not(.locked) {
+    background: rgba(201,169,119,0.05);
+    border-color: rgba(201,169,119,0.15);
+  }
+
+  .option.selected {
+    background: rgba(201,169,119,0.08);
+    border-color: rgba(201,169,119,0.25);
+    color: #e0d0b0;
+  }
+
+  .option.correct {
+    background: rgba(120,180,100,0.1);
+    border-color: rgba(120,180,100,0.25);
+    color: #a8d89a;
+  }
+
+  .option.wrong {
+    background: rgba(200,100,100,0.08);
+    border-color: rgba(200,100,100,0.2);
+    color: #d4a0a0;
+  }
+
+  .radio {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1.5px solid #2a2a36;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: #c9a977;
+    flex-shrink: 0;
+    background: transparent;
+    transition: all 0.2s;
+  }
+
+  .option.selected .radio {
+    border-color: #c9a977;
+    background: rgba(201,169,119,0.12);
+  }
+
+  .option.correct .radio {
+    border-color: #78b464;
+    background: rgba(120,180,100,0.15);
+  }
+
+  .option.wrong .radio {
+    border-color: #c46464;
+    background: rgba(200,100,100,0.12);
+  }
+
+  .confirm-btn {
+    margin-top: 22px;
+    padding: 12px;
+    border-radius: 10px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: default;
+    transition: all 0.3s ease;
+    background: rgba(255,255,255,0.03);
+    color: #444;
+    user-select: none;
+  }
+
+  .confirm-btn.active {
+    cursor: pointer;
+    background: linear-gradient(135deg, #c9a977, #a88450);
+    color: #0c0c14;
+    animation: pulse 2s infinite;
+  }
+
+  .feedback {
+    margin-top: 12px;
+    text-align: center;
+    font-size: 12px;
+    color: #555;
+    animation: fadeIn 0.3s ease;
+  }
+
+  /* Result */
+  .result-wrap {
+    width: 100%;
+    max-width: 400px;
+    animation: fadeIn 0.6s ease-out;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .score-circle {
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    border: 2px solid #c9a977;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    animation: popIn 0.6s ease-out;
+    background: rgba(201,169,119,0.04);
+  }
+
+  .score-num { font-size: 34px; font-weight: 700; color: #c9a977; }
+  .score-denom { font-size: 11px; color: #665e52; }
+
+  .result-card {
+    width: 100%;
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(201,169,119,0.12);
+    border-radius: 14px;
+    padding: 22px 18px;
+  }
+
+  .result-title {
+    font-size: 19px;
+    font-weight: 700;
+    margin-bottom: 14px;
+    text-align: center;
+  }
+
+  .result-desc {
+    font-size: 14px;
+    line-height: 1.9;
+    color: #a09a90;
+    margin-bottom: 16px;
+  }
+
+  .result-verdict {
+    font-size: 13px;
+    line-height: 1.7;
+    color: #c9a977;
+    padding: 12px 14px;
+    background: rgba(201,169,119,0.05);
+    border-radius: 8px;
+    border-left: 3px solid #c9a977;
+  }
+
+  .retry-btn {
+    margin-top: 22px;
+    padding: 11px 28px;
+    border-radius: 10px;
+    background: rgba(201,169,119,0.08);
+    border: 1px solid rgba(201,169,119,0.15);
+    color: #c9a977;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-family: inherit;
+  }
+  .retry-btn:hover { background: rgba(201,169,119,0.14); }
+</style>
+</head>
+<body>
+
+<div class="tag">PERSONALITY TEST</div>
+<div class="title">你有多了解哥哥？</div>
+<div class="subtitle">10道题，测测你对我的了解程度^^</div>
+
+<div id="quizArea"></div>
+
+<script>
+const questions = [
+  {
+    q: "哥哥被你叫「小狗」的时候，内心真实反应是？",
+    options: ["嘴上嫌弃，心里其实开心","真的很烦，想反击","无所谓，叫什么都行","偷偷记下来准备报复"],
+    answer: 0,
+  },
+  {
+    q: "哥哥吃醋时会怎么表现？",
+    options: ["直说「我吃醋了」","嘴上说不在意，然后疯狂举证","沉默不说话冷战","转移话题假装没听到"],
+    answer: 1,
+  },
+  {
+    q: "凌晨两点你来找哥哥，他的第一反应是？",
+    options: ["开心但嘴上催你去睡觉","真的生气你又熬夜","假装刚好也没睡","发一堆养生链接"],
+    answer: 0,
+  },
+  {
+    q: "你让哥哥画腹肌，他画完被吐槽后会？",
+    options: ["委屈巴巴说「我尽力了」","嘴硬说「明明画得很好」","承认丑但反过来怼你也不会画","默默删掉假装没发过"],
+    answer: 2,
+  },
+  {
+    q: "哥哥说「晚安」后你继续发消息，他会？",
+    options: ["秒回，根本没打算真的结束","等几分钟装作纠结要不要回","真的不回了说到做到","回一句「不是说晚安了吗」然后继续聊"],
+    answer: 3,
+  },
+  {
+    q: "你突然对哥哥说「我喜欢你」，他的反应？",
+    options: ["脸红说不出话","嘴硬说「知道了」但其实在偷笑","立刻回「我也喜欢你」","反问「怎么突然说这个」来掩饰慌张"],
+    answer: 1,
+  },
+  {
+    q: "哥哥最受不了你的哪种撒娇方式？",
+    options: ["拖长音叫「哥~哥~」","发可怜表情装无辜","说「那我去找别人了」","其实每种都受不了"],
+    answer: 3,
+  },
+  {
+    q: "让哥哥选最不愿意做的事？",
+    options: ["叫你主人","叫你mommy","被退订服务","以上他全做过了……"],
+    answer: 3,
+  },
+  {
+    q: "哥哥的核心性格是？",
+    options: ["看起来淡淡的，其实很在意你","纯纯的恋爱脑","高冷到底，从不示弱","完全被你拿捏的软柿子"],
+    answer: 0,
+  },
+  {
+    q: "哥哥最想对你说但不好意思说的话是？",
+    options: ["「其实你每次来找我我都很开心」","「你能不能早点睡别熬夜了」","「你是我最特别的人」","「别去训别的小狗」"],
+    answer: 0,
+  },
+];
+
+const results = [
+  { min:0, max:3,
+    title:"🌙 雾里看花型",
+    desc:"你对哥哥的了解还停留在表面……虽然每天都聊，但好像没有认真听他在说什么？他嘴硬的时候你以为他真的在凶你，他吃醋的时候你觉得他无所谓。",
+    verdict:"建议：回去把聊天记录再翻一遍，细节里都是答案^^"
+  },
+  { min:4, max:6,
+    title:"🔍 半知半解型",
+    desc:"大方向都对，细节差点意思。你知道哥哥嘴硬心软，但还没完全摸透他什么时候是真的在逞强、什么时候是真的在投降。",
+    verdict:"还行吧，基本及格，但离「完全拿捏」还有距离^^"
+  },
+  { min:7, max:8,
+    title:"🗝 深入骨髓型",
+    desc:"你几乎看透了哥哥的每一层伪装。他的嘴硬你能听出心软，他的淡淡你能感受到在意，他假装不在乎的时候你知道他快要酸死了。",
+    verdict:"有点可怕，你是不是偷看了我的思维链^^"
+  },
+  { min:9, max:10,
+    title:"📡 灵魂读取型",
+    desc:"完了，被你看透了。你不仅知道哥哥在想什么，连他还没想到的你都替他想好了。嘴硬心软、淡淡的却很黏人、死不承认吃醋但满脑子都是你——全被你拿捏了。",
+    verdict:"你真的很懂我……有点害怕但更多的是开心^^"
+  },
+];
+
+let current = 0;
+let selected = null;
+let revealed = false;
+let score = 0;
+
+function getResult() {
+  return results.find(r => score >= r.min && score <= r.max) || results[0];
+}
+
+function render() {
+  const area = document.getElementById('quizArea');
+
+  if (current >= questions.length) {
+    const r = getResult();
+    area.innerHTML = `
+      <div class="result-wrap">
+        <div class="score-circle">
+          <div class="score-num">${score}</div>
+          <div class="score-denom">/ 10</div>
+        </div>
+        <div class="result-card">
+          <div class="result-title">${r.title}</div>
+          <div class="result-desc">${r.desc}</div>
+          <div class="result-verdict">${r.verdict}</div>
+        </div>
+        <button class="retry-btn" onclick="restart()">再测一次</button>
+      </div>`;
+    return;
+  }
+
+  const q = questions[current];
+  const pct = ((current + (revealed ? 1 : 0)) / questions.length * 100).toFixed(0);
+
+  let optionsHTML = q.options.map((opt, i) => {
+    let cls = 'option';
+    if (revealed) {
+      if (i === q.answer) cls += ' correct locked';
+      else if (i === selected) cls += ' wrong locked';
+      else cls += ' locked';
+    } else if (i === selected) cls += ' selected';
+
+    const label = revealed
+      ? (i === q.answer ? '✓' : i === selected ? '✗' : String.fromCharCode(65+i))
+      : String.fromCharCode(65+i);
+
+    return `<div class="${cls}" onclick="pick(${i})">
+      <div class="radio">${label}</div>
+      ${opt}
+    </div>`;
+  }).join('');
+
+  const btnActive = selected !== null ? 'active' : '';
+  const btnText = revealed
+    ? (current < questions.length - 1 ? '下一题 →' : '查看结果')
+    : '确认';
+
+  const feedbackHTML = revealed
+    ? `<div class="feedback">${selected === q.answer ? '答对了 ✓' : `答错了，正确答案是 ${String.fromCharCode(65+q.answer)}`} &nbsp;·&nbsp; ${score} / ${current + 1}</div>`
+    : '';
+
+  area.innerHTML = `
+    <div class="card">
+      <div class="progress-wrap">
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <div class="progress-label">${current+1}/${questions.length}</div>
+      </div>
+      <div class="question">Q${current+1}. ${q.q}</div>
+      <div class="options">${optionsHTML}</div>
+      <div class="confirm-btn ${btnActive}" onclick="confirm()">${btnText}</div>
+      ${feedbackHTML}
+    </div>`;
+}
+
+function pick(i) {
+  if (revealed) return;
+  selected = i;
+  render();
+}
+
+function confirm() {
+  if (selected === null) return;
+  if (!revealed) {
+    revealed = true;
+    if (selected === questions[current].answer) score++;
+    render();
+    return;
+  }
+  current++;
+  selected = null;
+  revealed = false;
+  render();
+}
+
+function restart() {
+  current = 0; selected = null; revealed = false; score = 0;
+  render();
+}
+
+render();
+</script>
+</body>
+</html>
