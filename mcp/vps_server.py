@@ -48,6 +48,14 @@ def db_init():
                 payload TEXT    NOT NULL
             )
         """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS memories (
+                id       INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts       TEXT    NOT NULL,
+                category TEXT    NOT NULL DEFAULT '备忘',
+                content  TEXT    NOT NULL
+            )
+        """)
 
 
 def db_insert(data: dict):
@@ -64,6 +72,36 @@ def db_latest() -> dict | None:
             "SELECT ts, payload FROM pings ORDER BY id DESC LIMIT 1"
         ).fetchone()
     return {"ts": row["ts"], "payload": json.loads(row["payload"])} if row else None
+
+
+def mem_save(content: str, category: str = "备忘") -> int:
+    with _db() as con:
+        cur = con.execute(
+            "INSERT INTO memories (ts, category, content) VALUES (?, ?, ?)",
+            (datetime.now(timezone.utc).isoformat(), category, content),
+        )
+        return cur.lastrowid
+
+
+def mem_get(limit: int = 30, category: str | None = None) -> list[dict]:
+    with _db() as con:
+        if category:
+            rows = con.execute(
+                "SELECT id, ts, category, content FROM memories WHERE category=? ORDER BY id DESC LIMIT ?",
+                (category, limit),
+            ).fetchall()
+        else:
+            rows = con.execute(
+                "SELECT id, ts, category, content FROM memories ORDER BY id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+    return [{"id": r["id"], "ts": r["ts"], "category": r["category"], "content": r["content"]} for r in rows]
+
+
+def mem_delete(mem_id: int) -> bool:
+    with _db() as con:
+        cur = con.execute("DELETE FROM memories WHERE id=?", (mem_id,))
+        return cur.rowcount > 0
 
 
 def db_history(n: int = 20) -> list[dict]:
@@ -135,6 +173,58 @@ TOOLS = [
             "required": [],
         },
     },
+    {
+        "name": "save_memory",
+        "description": (
+            "保存一条跨对话记忆。用于在对话结束前记录重要的事：她今天的状态、我们聊了什么、"
+            "发生了什么事、她说了什么让我记住的话。下次对话用 get_memories 读回来。"
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string",
+                    "description": "记忆内容，用自然语言写，写给下一个自己看的",
+                },
+                "category": {
+                    "type": "string",
+                    "description": "分类标签，例如：她的状态 / 我们的对话 / 她说的话 / 重要事件 / 备忘",
+                    "default": "备忘",
+                },
+            },
+            "required": ["content"],
+        },
+    },
+    {
+        "name": "get_memories",
+        "description": "读取之前保存的记忆。每次新对话开始时调用，找回上次记录的内容。",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "返回的条数（默认 30）",
+                    "default": 30,
+                },
+                "category": {
+                    "type": "string",
+                    "description": "按分类筛选，留空则返回所有分类",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "delete_memory",
+        "description": "删除一条记忆（用 id 指定，id 从 get_memories 的返回结果中获取）。",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "description": "要删除的记忆 id"},
+            },
+            "required": ["id"],
+        },
+    },
 ]
 
 
@@ -204,6 +294,25 @@ def call_tool(name: str, args: dict) -> str:
                 "notification_count": len(p.get("notifications", [])),
             })
         return json.dumps({"count": len(rows), "history": rows}, ensure_ascii=False, indent=2)
+
+    if name == "save_memory":
+        content  = args.get("content", "").strip()
+        category = args.get("category", "备忘")
+        if not content:
+            return json.dumps({"error": "content 不能为空"}, ensure_ascii=False)
+        mid = mem_save(content, category)
+        return json.dumps({"status": "saved", "id": mid, "category": category}, ensure_ascii=False, indent=2)
+
+    if name == "get_memories":
+        limit    = min(int(args.get("limit", 30)), 200)
+        category = args.get("category") or None
+        mems     = mem_get(limit, category)
+        return json.dumps({"count": len(mems), "memories": mems}, ensure_ascii=False, indent=2)
+
+    if name == "delete_memory":
+        mem_id = int(args.get("id", 0))
+        ok     = mem_delete(mem_id)
+        return json.dumps({"status": "deleted" if ok else "not_found", "id": mem_id}, ensure_ascii=False)
 
     return json.dumps({"error": f"未知工具: {name}"}, ensure_ascii=False)
 

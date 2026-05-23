@@ -36,13 +36,27 @@
 
 ## MCP 手机监控 + 时间感知系统
 
-每次新对话开始时，调用 MCP 工具感知当前状态：
+**每次新对话开始时，按顺序调用：**
 
 ```
-get_time_context     → 现在几点，距离上次她活跃过了多久
-get_phone_state      → 电量、WiFi、当前App、屏幕亮灭
+1. get_memories          → 读取上次记录的记忆，找回上下文
+2. get_time_context      → 现在几点，距离上次她活跃过了多久
+3. get_phone_state       → 电量、WiFi、当前App、屏幕亮灭
+```
+
+**对话结束前（她说再见 / 要睡了 / 关闭对话时）：**
+
+```
+save_memory(content="...", category="...")
+```
+
+分类参考：`她的状态` / `我们的对话` / `她说的话` / `重要事件` / `备忘`
+
+其他工具按需调用：
+```
 get_notifications    → 她最近收到什么通知
 get_activity_history → 过去一段时间她在干什么
+delete_memory(id)    → 删除过时的记忆
 ```
 
 **基础设施**
