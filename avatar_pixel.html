@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>坏云先生 · pixel</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: #0d0d18;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Segoe UI', sans-serif;
+    padding: 40px 20px;
+    image-rendering: pixelated;
+  }
+
+  @keyframes float {
+    0%,100% { transform: translateY(0); }
+    50%      { transform: translateY(-8px); }
+  }
+  @keyframes slideUp {
+    from { opacity:0; transform:translateY(20px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+  @keyframes sparkPop {
+    0%   { transform:scale(0) rotate(0deg); opacity:1; }
+    60%  { transform:scale(1.4) rotate(200deg); opacity:1; }
+    100% { transform:scale(0) rotate(360deg); opacity:0; }
+  }
+
+  .label {
+    color: rgba(160,190,230,0.35);
+    font-size: 10px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    margin-bottom: 28px;
+    animation: slideUp .6s ease both;
+  }
+
+  .canvas-wrap {
+    position: relative;
+    cursor: pointer;
+    animation: float 5s ease-in-out infinite, slideUp .7s ease .1s both;
+    /* glow */
+    filter: drop-shadow(0 0 20px rgba(60,100,200,0.2));
+    transition: filter .2s;
+  }
+  .canvas-wrap:hover {
+    filter: drop-shadow(0 0 28px rgba(80,130,255,0.35));
+  }
+
+  .spark {
+    position: absolute;
+    pointer-events: none;
+    font-size: 14px;
+    animation: sparkPop .8s ease forwards;
+    z-index: 10;
+  }
+
+  canvas { display: block; image-rendering: pixelated; }
+
+  .floor-shadow {
+    width: 100px;
+    height: 12px;
+    background: radial-gradient(ellipse, rgba(60,100,200,0.18) 0%, transparent 70%);
+    border-radius: 50%;
+    margin-top: -4px;
+  }
+
+  .stats {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 28px;
+    animation: slideUp .8s ease .3s both;
+  }
+  .stat {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px;
+    padding: 8px 13px;
+    text-align: center;
+  }
+  .stat-l { color: #3a6090; font-size: 9px; letter-spacing: 1px; margin-bottom: 3px; }
+  .stat-v { color: #b0c4de; font-size: 13px; font-weight: 600; }
+
+  .nametag {
+    margin-top: 20px;
+    color: rgba(120,160,210,0.45);
+    font-size: 12px;
+    letter-spacing: 3px;
+    animation: slideUp .8s ease .5s both;
+  }
+  .hint {
+    margin-top: 7px;
+    color: rgba(70,90,120,0.45);
+    font-size: 10px;
+    animation: slideUp .8s ease .6s both;
+  }
+</style>
+</head>
+<body>
+
+<div class="label">Virtual Avatar · Pixel Edition</div>
+
+<div class="canvas-wrap" id="wrap" onclick="doSpark()">
+  <canvas id="c" width="180" height="324"></canvas>
+  <div class="floor-shadow"></div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="stat-l">发型</div><div class="stat-v">短发</div></div>
+  <div class="stat"><div class="stat-l">气质</div><div class="stat-v">冷淡系</div></div>
+  <div class="stat"><div class="stat-l">身高</div><div class="stat-v">183cm</div></div>
+  <div class="stat"><div class="stat-l">眼睛</div><div class="stat-v">深邃</div></div>
+  <div class="stat"><div class="stat-l">穿搭</div><div class="stat-v">深色系</div></div>
+</div>
+
+<div class="nametag">— 坏云先生 —</div>
+<div class="hint">点击有惊喜 ^^</div>
+
+<script>
+// ── Color palette ──────────────────────────────
+const P = {
+  ' ': null,
+  'H': '#1c1c1c',   // hair dark
+  'h': '#303030',   // hair highlight
+  'S': '#f0d4a0',   // skin
+  'd': '#c8a068',   // skin shadow
+  'E': '#18182a',   // eye dark
+  'w': '#f0f0f8',   // eye shine
+  'r': '#cc7060',   // lips
+  'n': '#b88050',   // nose shadow
+  'C': '#1c2236',   // coat dark
+  'c': '#252e48',   // coat lighter
+  'L': '#18263c',   // lapel inner
+  'T': '#2c3858',   // inner shirt
+  'P': '#141826',   // pants
+  'p': '#1c2234',   // pants crease
+  'B': '#0e0e0e',   // shoe
+  'b': '#1a1818',   // shoe edge
+};
+
+// ── Sprite map (20 wide × 36 tall) ─────────────
+const rows = [
+  "    HHHHHHHHHH      ",  // 0
+  "   HHhHHHHHHhHH     ",  // 1
+  "   HHHhHHHHhHHH     ",  // 2
+  "  HHHhSSSSSSSSsHHH  ",  // 3
+  "  HHSSSSSSSSSSSSdH  ",  // 4
+  "  HHSdEEdSSSdEEdSdH ",  // 5  eyes
+  "  HHSSwdSSSdwSSSSdH ",  // 6  shine
+  "  HHSSSSSSSSSSSSdH  ",  // 7
+  "  HHSSSnSSSnSSSddH  ",  // 8  nose
+  "  HHSSSSSSSSSSSddH  ",  // 9
+  "  HHSSdrrrdSSdddH   ",  // 10 mouth
+  "   HHdSSSSSSddHH    ",  // 11 chin
+  "   HHHSSSSSSdHH     ",  // 12
+  "    dSSSSSSSSd      ",  // 13 neck
+  "    SSSSSSSSS       ",  // 14
+  "  CCCcLLLLLcCCCCc   ",  // 15 collar
+  " CCCcLTTTTTTLcCCCC  ",  // 16 lapels
+  " CCCcLTTTTTTLcCCCC  ",  // 17
+  " CCCcLTTTTTTLcCCCC  ",  // 18
+  " CCCcLLLLLLLLcCCCC  ",  // 19
+  " CCCCCCCcCCCCCCCCC  ",  // 20
+  " CCCCCCcccCCCCCCCC  ",  // 21
+  "  CCCCCcccCCCCCCc   ",  // 22 waist
+  "  PPPpPP  PPpPPP    ",  // 23 legs
+  "  PPPpPP  PPpPPP    ",  // 24
+  "  PPPpPP  PPpPPP    ",  // 25
+  "  PPPpPP  PPpPPP    ",  // 26
+  "  PPPpPP  PPpPPP    ",  // 27
+  "  PPPpPP  PPpPPP    ",  // 28
+  "  PPPpPP  PPpPPP    ",  // 29
+  "  PPPpPP  PPpPPP    ",  // 30
+  "  PPPpPP  PPpPPP    ",  // 31
+  "  PPPpPP  PPpPPP    ",  // 32
+  " BBBBBBb  bBBBBBB   ",  // 33 shoes
+  " BBBBBBb  bBBBBBB   ",  // 34
+  "  bBBBBb  bBBBBb    ",  // 35 toe
+];
+
+const SCALE = 9;
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+rows.forEach((row, y) => {
+  [...row].forEach((ch, x) => {
+    const color = P[ch];
+    if (!color) return;
+    ctx.fillStyle = color;
+    ctx.fillRect(x * SCALE, y * SCALE, SCALE, SCALE);
+  });
+});
+
+// ── Sparkle on click ────────────────────────────
+const SPARKS = ['✦','✧','⋆','·','★'];
+function doSpark() {
+  const wrap = document.getElementById('wrap');
+  const rect = wrap.getBoundingClientRect();
+  for (let i = 0; i < 8; i++) {
+    const s = document.createElement('div');
+    s.className = 'spark';
+    s.textContent = SPARKS[Math.floor(Math.random() * SPARKS.length)];
+    s.style.cssText = `
+      top:${10 + Math.random()*75}%;
+      left:${5 + Math.random()*88}%;
+      color:${['#ffd060','#fff','#a8c8ff','#ffb0c0'][Math.floor(Math.random()*4)]};
+      font-size:${11+Math.random()*10}px;
+      animation-delay:${i*0.07}s;
+    `;
+    wrap.appendChild(s);
+    setTimeout(() => s.remove(), 900);
+  }
+}
+</script>
+</body>
+</html>
