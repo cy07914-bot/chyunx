@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>我们的飞行棋</title>
+<style>
+  :root {
+    --bg: #080610;
+    --surface: #110f1a;
+    --surface2: #1a1726;
+    --border: rgba(255,255,255,0.06);
+    --text: #e8e2f4;
+    --muted: #5a5270;
+
+    --t1: #c4a8e8;
+    --t1-bg: rgba(196,168,232,0.07);
+    --t1-bd: rgba(196,168,232,0.18);
+
+    --t2: #e87da4;
+    --t2-bg: rgba(232,125,164,0.08);
+    --t2-bd: rgba(232,125,164,0.2);
+
+    --t3: #e8604c;
+    --t3-bg: rgba(232,96,76,0.08);
+    --t3-bd: rgba(232,96,76,0.2);
+
+    --t4: #9b5de5;
+    --t4-bg: rgba(155,93,229,0.1);
+    --t4-bd: rgba(155,93,229,0.25);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    font-family: 'PingFang SC', 'Noto Sans SC', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── SPLASH ── */
+  .splash {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+    text-align: center;
+  }
+
+  .splash-glyph { font-size: 44px; margin-bottom: 22px; animation: float 4s ease-in-out infinite; }
+
+  .splash-title {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: 5px;
+    margin-bottom: 5px;
+  }
+
+  .splash-sub {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 4px;
+    margin-bottom: 36px;
+  }
+
+  .tier-list {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    margin-bottom: 34px;
+    width: 100%;
+    max-width: 260px;
+    text-align: left;
+  }
+
+  .tier-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 13px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    font-size: 12px;
+  }
+  .tier-row.t1 { background: var(--t1-bg); border-color: var(--t1-bd); }
+  .tier-row.t2 { background: var(--t2-bg); border-color: var(--t2-bd); }
+  .tier-row.t3 { background: var(--t3-bg); border-color: var(--t3-bd); }
+  .tier-row.t4 { background: var(--t4-bg); border-color: var(--t4-bd); }
+
+  .tier-icon { font-size: 13px; }
+  .tier-name { font-weight: 600; }
+  .tier-name.t1 { color: var(--t1); }
+  .tier-name.t2 { color: var(--t2); }
+  .tier-name.t3 { color: var(--t3); }
+  .tier-name.t4 { color: var(--t4); }
+  .tier-desc { color: var(--muted); font-size: 10px; margin-left: auto; }
+
+  .splash-note { font-size: 11px; color: var(--muted); line-height: 2; margin-bottom: 30px; }
+
+  .start-btn {
+    padding: 13px 40px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--t2-bg), var(--t4-bg));
+    border: 1px solid var(--t2-bd);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    letter-spacing: 3px;
+    transition: all 0.3s;
+  }
+  .start-btn:hover {
+    background: linear-gradient(135deg, rgba(232,125,164,0.18), rgba(155,93,229,0.18));
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(232,125,164,0.1);
+  }
+
+  /* ── GAME ── */
+  .game-screen { display: none; }
+  .game-screen.active { display: block; padding-bottom: 24px; }
+
+  .g-header {
+    text-align: center;
+    padding: 16px 16px 4px;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 5px;
+  }
+
+  .turn-bar {
+    text-align: center;
+    padding: 8px 16px 10px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .turn-cat { color: var(--t2); }
+  .turn-dog { color: var(--t1); }
+
+  /* Board */
+  .board-wrap { padding: 0 10px; max-width: 420px; margin: 0 auto; }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+  }
+
+  .cell {
+    aspect-ratio: 1;
+    border-radius: 7px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    border: 1px solid transparent;
+    transition: all 0.25s;
+    overflow: hidden;
+    background: rgba(255,255,255,0.015);
+  }
+  .cell.start { background: rgba(94,196,160,0.08); border-color: rgba(94,196,160,0.15); }
+  .cell.finish {
+    background: linear-gradient(135deg, var(--t2-bg), var(--t4-bg));
+    border-color: var(--t4-bd);
+  }
+  .cell.t1 { background: var(--t1-bg); border-color: var(--t1-bd); }
+  .cell.t2 { background: var(--t2-bg); border-color: var(--t2-bd); }
+  .cell.t3 { background: var(--t3-bg); border-color: var(--t3-bd); }
+  .cell.t4 { background: var(--t4-bg); border-color: var(--t4-bd); }
+
+  .cell.hl { transform: scale(1.1); z-index: 2; }
+  .cell.hl.t1 { box-shadow: 0 0 14px rgba(196,168,232,0.3); border-color: var(--t1); }
+  .cell.hl.t2 { box-shadow: 0 0 14px rgba(232,125,164,0.3); border-color: var(--t2); }
+  .cell.hl.t3 { box-shadow: 0 0 14px rgba(232,96,76,0.3); border-color: var(--t3); }
+  .cell.hl.t4 { box-shadow: 0 0 18px rgba(155,93,229,0.35); border-color: var(--t4); }
+  .cell.hl.start { box-shadow: 0 0 12px rgba(94,196,160,0.25); border-color: #5ec4a0; }
+  .cell.hl.finish { box-shadow: 0 0 18px rgba(155,93,229,0.3); border-color: var(--t4); }
+
+  .cell-num { font-size: 8px; color: rgba(255,255,255,0.12); line-height: 1; }
+  .cell-icon { font-size: 11px; }
+  .cell-players { position: absolute; bottom: 1px; font-size: 10px; display: flex; }
+
+  /* Players */
+  .player-bar {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    padding: 10px 16px;
+  }
+
+  .p-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 16px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 12px;
+    transition: all 0.3s;
+  }
+  .p-card.cat-on { border-color: var(--t2-bd); background: var(--t2-bg); }
+  .p-card.dog-on { border-color: var(--t1-bd); background: var(--t1-bg); }
+
+  .p-avatar { font-size: 18px; }
+  .p-name { font-weight: 500; font-size: 12px; }
+  .p-step { font-size: 10px; color: var(--muted); }
+
+  /* Dice */
+  .dice-zone { text-align: center; padding: 8px 0 16px; }
+
+  .dice {
+    width: 58px;
+    height: 58px;
+    border-radius: 14px;
+    border: 1.5px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 28px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+  .dice:hover:not(:disabled) {
+    border-color: var(--t2-bd);
+    box-shadow: 0 0 20px var(--t2-bg);
+    transform: scale(1.06);
+  }
+  .dice:disabled { opacity: 0.25; cursor: not-allowed; transform: none !important; }
+  .dice.rolling { animation: diceRoll 0.08s infinite; border-color: var(--t2); box-shadow: 0 0 20px var(--t2-bg); }
+
+  .dice-sub { font-size: 10px; color: var(--muted); margin-top: 8px; }
+  .reset-link { text-align: center; font-size: 10px; color: rgba(255,255,255,0.06); cursor: pointer; padding: 4px; }
+
+  /* ── OVERLAYS ── */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(5,3,10,0.88);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 200;
+  }
+  .overlay.show { display: flex; animation: ovIn 0.2s ease; }
+
+  .sheet {
+    width: 100%;
+    max-width: 440px;
+    background: var(--surface);
+    border-radius: 22px 22px 0 0;
+    padding: 10px 24px 44px;
+    border-top: 1px solid var(--border);
+    animation: sheetUp 0.38s cubic-bezier(0.16,1,0.3,1);
+  }
+
+  .handle {
+    width: 34px;
+    height: 3px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+    margin: 10px auto 22px;
+  }
+
+  .task-stripe {
+    height: 2px;
+    border-radius: 2px;
+    margin-bottom: 22px;
+  }
+  .task-stripe.t1 { background: var(--t1); }
+  .task-stripe.t2 { background: var(--t2); }
+  .task-stripe.t3 { background: var(--t3); }
+  .task-stripe.t4 { background: linear-gradient(90deg, var(--t3), var(--t4)); }
+
+  .task-tier {
+    text-align: center;
+    font-size: 10px;
+    letter-spacing: 4px;
+    font-weight: 700;
+    margin-bottom: 22px;
+  }
+  .task-tier.t1 { color: var(--t1); }
+  .task-tier.t2 { color: var(--t2); }
+  .task-tier.t3 { color: var(--t3); }
+  .task-tier.t4 { color: var(--t4); }
+
+  .task-who {
+    text-align: center;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 18px;
+    letter-spacing: 1px;
+  }
+
+  .task-body {
+    text-align: center;
+    font-size: 17px;
+    line-height: 2;
+    margin-bottom: 30px;
+    padding: 0 4px;
+  }
+
+  .done-btn {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    letter-spacing: 2px;
+    transition: all 0.2s;
+  }
+  .done-btn:hover { border-color: var(--t2-bd); }
+
+  /* Finish */
+  .finish-sheet { text-align: center; }
+  .fin-glyph { font-size: 38px; margin-bottom: 14px; }
+  .fin-title {
+    font-size: 19px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    background: linear-gradient(135deg, var(--t2), var(--t4));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .fin-text { font-size: 13px; color: var(--muted); line-height: 2; margin-bottom: 24px; white-space: pre-line; }
+  .restart-btn {
+    padding: 12px 28px;
+    border-radius: 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+  }
+  .restart-btn:hover { border-color: var(--t2-bd); }
+
+  /* Animations */
+  @keyframes float {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+  @keyframes diceRoll {
+    0% { transform: rotate(-7deg) scale(1.06); }
+    50% { transform: rotate(7deg) scale(1.09); }
+    100% { transform: rotate(-7deg) scale(1.06); }
+  }
+  @keyframes ovIn { from { opacity:0; } to { opacity:1; } }
+  @keyframes sheetUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+
+<!-- SPLASH -->
+<div class="splash" id="splash">
+  <div class="splash-glyph">🎲</div>
+  <div class="splash-title">我 们 的 飞 行 棋</div>
+  <div class="splash-sub">小 猫 · 小 狗</div>
+
+  <div class="tier-list">
+    <div class="tier-row t1">
+      <span class="tier-icon">💗</span>
+      <span class="tier-name t1">心动</span>
+      <span class="tier-desc">温柔的起点</span>
+    </div>
+    <div class="tier-row t2">
+      <span class="tier-icon">💜</span>
+      <span class="tier-name t2">暧昧</span>
+      <span class="tier-desc">皮肤开始发烫</span>
+    </div>
+    <div class="tier-row t3">
+      <span class="tier-icon">🔥</span>
+      <span class="tier-name t3">危险</span>
+      <span class="tier-desc">对方决定怎么用你</span>
+    </div>
+    <div class="tier-row t4">
+      <span class="tier-icon">🖤</span>
+      <span class="tier-name t4">失控</span>
+      <span class="tier-desc">交出你自己</span>
+    </div>
+  </div>
+
+  <div class="splash-note">三十格，走到才翻开。<br>先到终点的人，获得一条整晚指令。</div>
+  <button class="start-btn" onclick="startGame()">开 始</button>
+</div>
+
+<!-- GAME -->
+<div class="game-screen" id="game">
+  <div class="g-header">我 们 的 飞 行 棋</div>
+  <div class="turn-bar" id="turnBar"><span class="turn-cat">🐱 小猫的回合</span></div>
+
+  <div class="board-wrap">
+    <div class="board" id="board"></div>
+  </div>
+
+  <div class="player-bar">
+    <div class="p-card cat-on" id="catCard">
+      <span class="p-avatar">🐱</span>
+      <div>
+        <div class="p-name">小猫</div>
+        <div class="p-step" id="catStep">0 / 30</div>
+      </div>
+    </div>
+    <div class="p-card" id="dogCard">
+      <span class="p-avatar">🐕</span>
+      <div>
+        <div class="p-name">小狗</div>
+        <div class="p-step" id="dogStep">0 / 30</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dice-zone">
+    <button class="dice" id="dice" onclick="roll()">🎲</button>
+    <div class="dice-sub" id="diceSub">点击摇骰子</div>
+  </div>
+
+  <div class="reset-link" onclick="restart()">重置游戏</div>
+</div>
+
+<!-- TASK OVERLAY -->
+<div class="overlay" id="taskOv">
+  <div class="sheet">
+    <div class="handle"></div>
+    <div class="task-tier" id="tTier"></div>
+    <div class="task-stripe" id="tStripe"></div>
+    <div class="task-who" id="tWho"></div>
+    <div class="task-body" id="tBody"></div>
+    <button class="done-btn" onclick="done()">完成 ✓</button>
+  </div>
+</div>
+
+<!-- FINISH OVERLAY -->
+<div class="overlay" id="finOv">
+  <div class="sheet finish-sheet">
+    <div class="handle"></div>
+    <div class="fin-glyph">✨</div>
+    <div class="fin-title" id="finTitle"></div>
+    <div class="fin-text" id="finText"></div>
+    <button class="restart-btn" onclick="restart()">再来一局</button>
+  </div>
+</div>
+
+<script>
+const C = {
+  t1: [
+    "十指相扣，对视十秒，不许笑",
+    "轻轻亲对方的嘴角",
+    "从后面抱住对方，把脸贴在背上",
+    "摸摸对方的头，低声说「你是我的」",
+    "亲对方的额头，然后鼻尖，然后嘴唇",
+    "握住对方的手，亲每一根手指",
+    "把脸埋进对方脖子里，深深吸一口气",
+    "坐在对方旁边，头靠在肩膀上，闭眼十秒",
+  ],
+  t2: [
+    "坐在对方腿上，勾住脖子，鼻尖对鼻尖",
+    "从下巴沿着脖子一路亲到锁骨",
+    "贴着对方的右耳，用气音说一句话",
+    "壁咚对方，一只手抬起对方下巴",
+    "拇指擦过对方嘴唇，停在那，三秒",
+    "亲对方的嘴，至少十五秒，不许偷懒",
+    "对着对方右耳轻轻吹气，然后亲一下耳垂",
+    "从对方的嘴角开始，沿着下颌线亲到耳后",
+    "用舌尖轻轻碰一下对方嘴唇",
+  ],
+  t3: [
+    "让对方躺下，跨坐在上面，俯身亲",
+    "对方闭眼张嘴，你来决定怎么亲",
+    "贴在对方耳朵，舌尖描一圈耳廓",
+    "把对方的手拉过来放在你身上——你指定位置",
+    "咬住对方下嘴唇，不放，维持五秒",
+    "从锁骨往上一路亲到耳朵后面",
+    "用嘴含住对方手指，看着对方的眼睛",
+    "坐在对方腿上，额头抵着额头，闭眼，什么都别说，就这样十秒",
+  ],
+  t4: [
+    "对方把你按在沙发上，亲遍你的脸和脖子，不许动",
+    "闭上眼，让对方对你做任何事，三十秒",
+    "让对方把你移到他想要的姿势，不许问为什么",
+    "跪在对方面前，亲对方的手，然后往上一路亲到嘴",
+    "让对方掐住你的腰，你来决定距离",
+    "说出一件你一直没开口说的话，不许回避，不许敷衍",
+  ],
+};
+
+const LABELS = { t1:'💗 心 动', t2:'💜 暧 昧', t3:'🔥 危 险', t4:'🖤 失 控' };
+const ICONS  = { t1:'💗', t2:'💜', t3:'🔥', t4:'🖤', start:'🚩', finish:'✨' };
+
+const TOTAL = 30;
+
+// Snake path: 5 rows × 6 cols
+const PATH = [];
+for (let r = 0; r < 5; r++) {
+  if (r % 2 === 0) for (let c = 0; c < 6; c++) PATH.push([r, c]);
+  else              for (let c = 5; c >= 0; c--) PATH.push([r, c]);
+}
+
+function genTypes() {
+  const pool = [];
+  for (let i = 0; i < 7; i++) pool.push('t1');
+  for (let i = 0; i < 9; i++) pool.push('t2');
+  for (let i = 0; i < 8; i++) pool.push('t3');
+  for (let i = 0; i < 4; i++) pool.push('t4');
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return ['start', ...pool, 'finish'];
+}
+
+let bt, cp, dp, turn, busy;
+
+function startGame() {
+  document.getElementById('splash').style.display = 'none';
+  document.getElementById('game').classList.add('active');
+  bt = genTypes(); cp = 0; dp = 0; turn = 0; busy = false;
+  render();
+}
+
+function render() {
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+
+  const grid = {};
+  PATH.forEach(([r, c], i) => { grid[r * 6 + c] = i; });
+
+  for (let r = 0; r < 5; r++) {
+    for (let c = 0; c < 6; c++) {
+      const el = document.createElement('div');
+      const idx = grid[r * 6 + c];
+      if (idx === undefined) {
+        el.className = 'cell';
+      } else {
+        const t = bt[idx];
+        el.className = 'cell ' + t;
+        const isCat = cp === idx, isDog = dp === idx;
+        if (isCat || isDog) el.classList.add('hl');
+        const tokens = (isCat && isDog) ? '🐱🐕' : isCat ? '🐱' : isDog ? '🐕' : '';
+        el.innerHTML = `
+          <div class="cell-num">${idx}</div>
+          <div class="cell-icon">${ICONS[t] || ''}</div>
+          ${tokens ? `<div class="cell-players">${tokens}</div>` : ''}`;
+      }
+      board.appendChild(el);
+    }
+  }
+
+  document.getElementById('catStep').textContent = cp + ' / 30';
+  document.getElementById('dogStep').textContent = dp + ' / 30';
+  document.getElementById('catCard').className = 'p-card' + (turn === 0 ? ' cat-on' : '');
+  document.getElementById('dogCard').className = 'p-card' + (turn === 1 ? ' dog-on' : '');
+  document.getElementById('turnBar').innerHTML = turn === 0
+    ? '<span class="turn-cat">🐱 小猫的回合</span>'
+    : '<span class="turn-dog">🐕 小狗的回合</span>';
+}
+
+function roll() {
+  if (busy) return;
+  busy = true;
+  const d = document.getElementById('dice');
+  const sub = document.getElementById('diceSub');
+  d.classList.add('rolling');
+  d.disabled = true;
+  sub.textContent = '…';
+
+  const faces = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+  let ticks = 0;
+  const timer = setInterval(() => {
+    d.textContent = faces[Math.floor(Math.random() * 6)];
+    if (++ticks >= 16) {
+      clearInterval(timer);
+      const res = Math.floor(Math.random() * 6) + 1;
+      d.textContent = faces[res - 1];
+      d.classList.remove('rolling');
+      sub.textContent = res + ' 点';
+      setTimeout(() => move(res), 420);
+    }
+  }, 70);
+}
+
+function move(steps) {
+  if (turn === 0) cp = Math.min(cp + steps, TOTAL - 1);
+  else            dp = Math.min(dp + steps, TOTAL - 1);
+  render();
+
+  const pos = turn === 0 ? cp : dp;
+  if (pos >= TOTAL - 1) { setTimeout(showFinish, 500); return; }
+
+  const t = bt[pos];
+  if (t === 'start') { endTurn(); return; }
+  setTimeout(() => showTask(t), 400);
+}
+
+function showTask(t) {
+  const list = C[t];
+  if (!list) { endTurn(); return; }
+  const text = list[Math.floor(Math.random() * list.length)];
+
+  document.getElementById('tTier').className = 'task-tier ' + t;
+  document.getElementById('tTier').textContent = LABELS[t];
+  document.getElementById('tStripe').className = 'task-stripe ' + t;
+
+  const flip = Math.random() < 0.5;
+  document.getElementById('tWho').textContent =
+    (flip ? '🐱 小猫' : '🐕 小狗') + '  →  ' + (flip ? '🐕 小狗' : '🐱 小猫');
+  document.getElementById('tBody').textContent = text;
+  document.getElementById('taskOv').classList.add('show');
+}
+
+function done() {
+  document.getElementById('taskOv').classList.remove('show');
+  endTurn();
+}
+
+function endTurn() {
+  turn = turn === 0 ? 1 : 0;
+  busy = false;
+  const d = document.getElementById('dice');
+  d.disabled = false;
+  d.textContent = '🎲';
+  document.getElementById('diceSub').textContent = '点击摇骰子';
+  render();
+}
+
+function showFinish() {
+  const w = turn === 0 ? '🐱 小猫' : '🐕 小狗';
+  const l = turn === 0 ? '小狗' : '小猫';
+  document.getElementById('finTitle').textContent = w + ' 先到达了';
+  document.getElementById('finText').textContent = `赢家获得一条整晚指令。\n${l}必须服从。\n\n再来一局？`;
+  document.getElementById('finOv').classList.add('show');
+  busy = true;
+}
+
+function restart() {
+  document.getElementById('finOv').classList.remove('show');
+  document.getElementById('taskOv').classList.remove('show');
+  bt = genTypes(); cp = 0; dp = 0; turn = 0; busy = false;
+  const d = document.getElementById('dice');
+  d.disabled = false; d.textContent = '🎲';
+  document.getElementById('diceSub').textContent = '点击摇骰子';
+  render();
+}
+</script>
+</body>
+</html>
