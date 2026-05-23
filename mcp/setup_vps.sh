@@ -9,8 +9,8 @@
 
 set -e
 
-DOMAIN="YOUR_DOMAIN"          # 改成你的域名，例如 monitor.xinxin.me
-API_KEY="xinxin-key"          # 改成你的密钥（手机端也要一致）
+DOMAIN="mcp.chyunx.com"        # 子域名，需要在 DNS 加 A 记录指向 66.245.217.76
+API_KEY="xinxin-key"          # 改成你自己定的密钥（手机端也要一致）
 INSTALL_DIR="/opt/xinxin-monitor"
 PORT=8765
 
@@ -78,7 +78,7 @@ nginx -t && systemctl reload nginx
 
 echo "=== [5/5] 申请 SSL 证书 ==="
 certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m admin@"$DOMAIN" || \
-    echo "SSL 申请失败（可能需要 DNS 先生效），稍后手动运行: certbot --nginx -d $DOMAIN"
+    echo "SSL 申请失败（DNS 可能还没生效，等几分钟再手动运行: certbot --nginx -d $DOMAIN）"
 
 echo ""
 echo "=========================================="
