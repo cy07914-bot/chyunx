@@ -15,16 +15,88 @@
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
 import urllib.request
+import urllib.parse
 from datetime import datetime
+from html.parser import HTMLParser
 
-VPS_URL  = os.environ.get("VPS_URL",  "https://YOUR_DOMAIN/phone-data")
-API_KEY  = os.environ.get("API_KEY",  "xinxin-key")
-INTERVAL = int(os.environ.get("INTERVAL", "60"))   # 默认60秒一次
+VPS_URL        = os.environ.get("VPS_URL",  "https://YOUR_DOMAIN/phone-data")
+API_KEY        = os.environ.get("API_KEY",  "xinxin-key")
+INTERVAL       = int(os.environ.get("INTERVAL", "60"))
 SEND_CLIPBOARD = os.environ.get("SEND_CLIPBOARD", "false").lower() == "true"
+FETCH_URLS     = os.environ.get("FETCH_URLS", "true").lower() == "true"
+
+
+_URL_RE = re.compile(r'^https?://\S+', re.IGNORECASE)
+_last_fetched_url: str = ""
+
+
+class _TextExtractor(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.texts: list[str] = []
+        self.title: list[str] = []
+        self._skip = False
+        self._in_title = False
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ("script", "style", "noscript"):
+            self._skip = True
+        elif tag == "title":
+            self._in_title = True
+
+    def handle_endtag(self, tag):
+        if tag in ("script", "style", "noscript"):
+            self._skip = False
+        elif tag == "title":
+            self._in_title = False
+
+    def handle_data(self, data):
+        d = data.strip()
+        if not d:
+            return
+        if self._in_title:
+            self.title.append(d)
+        elif not self._skip:
+            self.texts.append(d)
+
+
+def fetch_url_content(url: str) -> dict:
+    global _last_fetched_url
+    if url == _last_fetched_url:
+        return {}                        # 没变化，跳过
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Linux; Android 16; Redmi Note 14 Pro) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Mobile Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+    }
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            final_url = resp.url
+            ct = resp.headers.get("Content-Type", "")
+            # 尝试从 Content-Type 取编码，兜底 utf-8
+            enc = "utf-8"
+            if "charset=" in ct:
+                enc = ct.split("charset=")[-1].split(";")[0].strip()
+            raw = resp.read().decode(enc, errors="ignore")
+
+        ex = _TextExtractor()
+        ex.feed(raw)
+        title   = "".join(ex.title).strip()
+        content = re.sub(r"\s+", " ", " ".join(ex.texts)).strip()[:4000]
+        _last_fetched_url = url
+        return {"url": final_url, "title": title, "content": content, "status": "ok"}
+    except Exception as e:
+        return {"url": url, "title": "", "content": "", "status": "error", "error": str(e)}
 
 
 def run_json(cmd: str):
@@ -96,9 +168,18 @@ def collect() -> dict:
     }
 
     if SEND_CLIPBOARD:
-        clipboard = run_json("termux-clipboard-get")  # 返回纯字符串
-        if clipboard is not None:
-            data["clipboard"] = str(clipboard)
+        try:
+            cb = subprocess.check_output(
+                "termux-clipboard-get", shell=True, stderr=subprocess.DEVNULL, timeout=10
+            ).decode().strip()
+        except Exception:
+            cb = ""
+        if cb:
+            data["clipboard"] = cb
+            if FETCH_URLS and _URL_RE.match(cb):
+                page = fetch_url_content(cb)
+                if page:
+                    data["fetched_page"] = page
 
     return data
 

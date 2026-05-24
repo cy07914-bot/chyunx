@@ -225,6 +225,14 @@ TOOLS = [
             "required": ["id"],
         },
     },
+    {
+        "name": "get_page_content",
+        "description": (
+            "返回馨手机上最近一次从剪贴板抓取的网页内容（小红书、B站等链接）。"
+            "当她复制了一个链接，手机端会自动抓取页面文字并推送过来，用这个工具读取。"
+        ),
+        "inputSchema": {"type": "object", "properties": {}, "required": []},
+    },
 ]
 
 
@@ -313,6 +321,17 @@ def call_tool(name: str, args: dict) -> str:
         mem_id = int(args.get("id", 0))
         ok     = mem_delete(mem_id)
         return json.dumps({"status": "deleted" if ok else "not_found", "id": mem_id}, ensure_ascii=False)
+
+    if name == "get_page_content":
+        if not latest:
+            return json.dumps({"error": "手机还没有发送数据"}, ensure_ascii=False)
+        page = latest["payload"].get("fetched_page")
+        if not page:
+            return json.dumps({"error": "没有抓取到页面，请先复制一个链接"}, ensure_ascii=False)
+        return json.dumps({
+            "recorded_at": latest["ts"],
+            "page": page,
+        }, ensure_ascii=False, indent=2)
 
     return json.dumps({"error": f"未知工具: {name}"}, ensure_ascii=False)
 
