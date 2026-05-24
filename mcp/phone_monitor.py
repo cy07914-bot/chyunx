@@ -113,11 +113,15 @@ def run_json(cmd: str):
 def get_current_app() -> str:
     """尝试获取当前前台 App，失败返回 '未知'。"""
     cmds = [
-        # Android 10+
+        # Android 10+ 标准
         "dumpsys window windows 2>/dev/null | grep -oE 'mCurrentFocus=Window\\{[a-f0-9]+ [A-Za-z]+ [^}]+\\}' | grep -oE '[a-z][a-zA-Z0-9._]+/[a-zA-Z0-9._]+' | head -1",
+        # displays 变体（部分 MIUI）
+        "dumpsys window displays 2>/dev/null | grep 'mCurrentFocus' | grep -oE '[a-z][a-zA-Z0-9.]+/[a-zA-Z0-9.]+' | head -1",
+        # activity top（MIUI/HyperOS 常见）
+        "dumpsys activity top 2>/dev/null | grep 'ACTIVITY' | grep -oE '[a-z][a-zA-Z0-9.]+/[a-zA-Z0-9._]+' | head -1",
         # 旧版 Android
         "dumpsys activity 2>/dev/null | grep 'mFocusedActivity' | grep -oE '[a-z][a-zA-Z0-9.]+/[a-zA-Z0-9.]+' | head -1",
-        # 兜底方案
+        # 兜底
         "dumpsys window 2>/dev/null | grep 'mFocusedApp' | grep -oE '[a-z][a-zA-Z0-9.]+/[a-zA-Z0-9.]+' | head -1",
     ]
     for cmd in cmds:
