@@ -104,6 +104,18 @@ def mem_delete(mem_id: int) -> bool:
         return cur.rowcount > 0
 
 
+def db_latest_page() -> dict | None:
+    with _db() as con:
+        rows = con.execute(
+            "SELECT ts, payload FROM pings ORDER BY id DESC LIMIT 20"
+        ).fetchall()
+    for row in rows:
+        p = json.loads(row["payload"])
+        if p.get("fetched_page"):
+            return {"ts": row["ts"], "payload": p}
+    return None
+
+
 def db_history(n: int = 20) -> list[dict]:
     with _db() as con:
         rows = con.execute(
@@ -323,14 +335,12 @@ def call_tool(name: str, args: dict) -> str:
         return json.dumps({"status": "deleted" if ok else "not_found", "id": mem_id}, ensure_ascii=False)
 
     if name == "get_page_content":
-        if not latest:
-            return json.dumps({"error": "手机还没有发送数据"}, ensure_ascii=False)
-        page = latest["payload"].get("fetched_page")
-        if not page:
-            return json.dumps({"error": "没有抓取到页面，请先复制一个链接"}, ensure_ascii=False)
+        entry = db_latest_page()
+        if not entry:
+            return json.dumps({"error": "没有抓取到页面，请先复制一个链接再点按钮"}, ensure_ascii=False)
         return json.dumps({
-            "recorded_at": latest["ts"],
-            "page": page,
+            "recorded_at": entry["ts"],
+            "page": entry["payload"]["fetched_page"],
         }, ensure_ascii=False, indent=2)
 
     return json.dumps({"error": f"未知工具: {name}"}, ensure_ascii=False)
