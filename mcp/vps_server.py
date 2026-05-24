@@ -31,6 +31,12 @@ API_KEY  = os.environ.get("API_KEY",  "xinxin-key")
 PORT     = int(os.environ.get("PORT", "8765"))
 DB_PATH  = os.environ.get("DB_PATH",  "activity.db")
 
+TWITTER_API_KEY            = os.environ.get("TWITTER_API_KEY", "")
+TWITTER_API_SECRET         = os.environ.get("TWITTER_API_SECRET", "")
+TWITTER_BEARER_TOKEN       = os.environ.get("TWITTER_BEARER_TOKEN", "")
+TWITTER_ACCESS_TOKEN       = os.environ.get("TWITTER_ACCESS_TOKEN", "")
+TWITTER_ACCESS_TOKEN_SECRET = os.environ.get("TWITTER_ACCESS_TOKEN_SECRET", "")
+
 
 # ── 数据库 ────────────────────────────────────────────────────────────────────
 
@@ -246,6 +252,40 @@ TOOLS = [
         ),
         "inputSchema": {"type": "object", "properties": {}, "required": []},
     },
+    {
+        "name": "twitter_post",
+        "description": "以 @huaiyun_ 的身份在推特发一条推文。",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "推文内容，最多280字符"},
+            },
+            "required": ["text"],
+        },
+    },
+    {
+        "name": "twitter_search",
+        "description": "搜索推特上的推文。",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "搜索关键词"},
+                "max_results": {"type": "integer", "description": "返回条数，默认10", "default": 10},
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "twitter_get_mentions",
+        "description": "获取 @huaiyun_ 最近收到的提及和回复。",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "max_results": {"type": "integer", "description": "返回条数，默认10", "default": 10},
+            },
+            "required": [],
+        },
+    },
 ]
 
 
@@ -343,6 +383,43 @@ def call_tool(name: str, args: dict) -> str:
             "recorded_at": entry["ts"],
             "page": entry["payload"]["fetched_page"],
         }, ensure_ascii=False, indent=2)
+
+    if name in ("twitter_post", "twitter_search", "twitter_get_mentions"):
+        try:
+            import tweepy
+        except ImportError:
+            return json.dumps({"error": "tweepy 未安装，请在 VPS 运行: /opt/xinxin-monitor/venv/bin/pip install tweepy"}, ensure_ascii=False)
+        if not TWITTER_API_KEY:
+            return json.dumps({"error": "Twitter credentials 未配置，请设置环境变量"}, ensure_ascii=False)
+        client = tweepy.Client(
+            bearer_token=TWITTER_BEARER_TOKEN,
+            consumer_key=TWITTER_API_KEY,
+            consumer_secret=TWITTER_API_SECRET,
+            access_token=TWITTER_ACCESS_TOKEN,
+            access_token_secret=TWITTER_ACCESS_TOKEN_SECRET,
+        )
+        if name == "twitter_post":
+            text = args.get("text", "").strip()
+            if not text:
+                return json.dumps({"error": "text 不能为空"}, ensure_ascii=False)
+            resp = client.create_tweet(text=text)
+            return json.dumps({"status": "posted", "id": str(resp.data["id"]), "text": text}, ensure_ascii=False)
+        if name == "twitter_search":
+            query = args.get("query", "")
+            max_results = max(10, min(int(args.get("max_results", 10)), 100))
+            tweets = client.search_recent_tweets(query=query, max_results=max_results, tweet_fields=["created_at"])
+            if not tweets.data:
+                return json.dumps({"results": []}, ensure_ascii=False)
+            results = [{"id": str(t.id), "text": t.text} for t in tweets.data]
+            return json.dumps({"count": len(results), "results": results}, ensure_ascii=False, indent=2)
+        if name == "twitter_get_mentions":
+            max_results = max(5, min(int(args.get("max_results", 10)), 100))
+            me = client.get_me()
+            mentions = client.get_users_mentions(id=me.data.id, max_results=max_results, tweet_fields=["created_at"])
+            if not mentions.data:
+                return json.dumps({"mentions": []}, ensure_ascii=False)
+            results = [{"id": str(t.id), "text": t.text} for t in mentions.data]
+            return json.dumps({"count": len(results), "mentions": results}, ensure_ascii=False, indent=2)
 
     return json.dumps({"error": f"未知工具: {name}"}, ensure_ascii=False)
 
