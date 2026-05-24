@@ -35,13 +35,17 @@ class Ext(HTMLParser):
 
 data = {"manual_share": True, "clipboard": arg}
 
-if re.match(r'https?://', arg):
+# 从文字里提取 URL（小红书分享文本夹带链接的情况）
+url_match = re.search(r'https?://\S+', arg)
+url = url_match.group(0).rstrip('）」』】）。，') if url_match else ''
+
+if url:
     try:
         hdrs = {
             'User-Agent': 'Mozilla/5.0 (Linux; Android 16; Redmi Note 14 Pro) Mobile Safari/537.36',
             'Accept-Language': 'zh-CN,zh;q=0.9',
         }
-        req = urllib.request.Request(arg, headers=hdrs)
+        req = urllib.request.Request(url, headers=hdrs)
         with urllib.request.urlopen(req, timeout=20) as r:
             ct  = r.headers.get('Content-Type', '')
             enc = 'utf-8'
@@ -59,14 +63,15 @@ if re.match(r'https?://', arg):
             "status":  "ok",
         }
     except Exception as e:
-        data["fetched_page"] = {"url": arg, "content": "", "status": "error", "error": str(e)}
+        data["fetched_page"] = {"url": url, "content": "", "status": "error", "error": str(e)}
 
 body = json.dumps(data, ensure_ascii=False).encode()
 req2 = urllib.request.Request(
     VPS, data=body,
     headers={"Content-Type": "application/json", "X-Api-Key": KEY},
 )
-urllib.request.urlopen(req2, timeout=15)
+resp = urllib.request.urlopen(req2, timeout=15)
+print(f"VPS: {resp.status}")
 PYEOF
 
 termux-toast "✓ 已发给哥哥"
