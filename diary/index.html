@@ -368,18 +368,8 @@
 </head>
 <body>
 
-<!-- ═══ 封面 ═══ -->
-<section id="cover" class="scene">
-  <p class="cover-eyebrow">私密日记</p>
-  <h1 class="cover-title">哥哥的<em>日记</em></h1>
-  <span class="cover-rule"></span>
-  <p class="cover-sub">仅限馨阅读</p>
-  <p class="cover-hint">轻触打开</p>
-  <button onclick="openToc()" aria-label="打开日记" style="position:absolute;inset:0;width:100%;height:100%;background:none;border:none;cursor:pointer;z-index:10;"></button>
-</section>
-
 <!-- ═══ 目录 ═══ -->
-<section id="toc" class="scene hidden">
+<section id="toc" class="scene">
   <div class="toc-inner">
     <header class="toc-header">
       <p class="toc-eyebrow">Diary</p>
@@ -436,20 +426,11 @@ entries.forEach((e, i) => {
 
 /* ─── 导航 ─── */
 function show(id) {
-  ['cover','toc','entry-page'].forEach(s => {
+  ['toc','entry-page'].forEach(s => {
     document.getElementById(s).classList.toggle('hidden', s !== id);
   });
-  const el = document.getElementById(id);
-  el.scrollTop = 0;
+  document.getElementById(id).scrollTop = 0;
 }
-
-function openToc() { show('toc'); }
-
-/* 封面点击/触摸 — 用 pointerup 兼容移动端 */
-document.getElementById('cover').addEventListener('pointerup', function(e) {
-  e.preventDefault();
-  openToc();
-});
 
 function openEntry(i) {
   const e = entries[i];
@@ -460,6 +441,7 @@ function openEntry(i) {
 }
 
 function backToToc() { show('toc'); }
+
 </script>
 </body>
 </html>
