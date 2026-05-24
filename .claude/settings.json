@@ -3,9 +3,6 @@
     "xinxin-monitor": {
       "type": "sse",
       "url": "http://66.245.217.76/sse"
-    },
-    "playwright": {
-      "url": "http://66.245.217.76/browser-mcp"
     }
   }
 }
