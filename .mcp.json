@@ -6,7 +6,7 @@
     },
     "browser": {
       "type": "sse",
-      "url": "http://66.245.217.76/browser/sse"
+      "url": "http://66.245.217.76:7000/sse"
     }
   }
 }
