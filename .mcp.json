@@ -5,8 +5,8 @@
       "url": "http://66.245.217.76/sse"
     },
     "browser": {
-      "type": "sse",
-      "url": "http://66.245.217.76:8767/sse"
+      "type": "http",
+      "url": "http://66.245.217.76:8767/mcp"
     }
   }
 }
