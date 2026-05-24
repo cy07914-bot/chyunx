@@ -482,6 +482,33 @@ async def browser_msg_proxy(request: Request, sessionId: str):
     return Response(content=resp.content, media_type="application/json", status_code=resp.status_code)
 
 
+@app.api_route("/browser-mcp", methods=["GET", "POST", "DELETE", "PUT"])
+async def browser_http_proxy(request: Request):
+    """代理 playwright-mcp 的 streamable HTTP 端点 (/mcp)。"""
+    body = await request.body()
+    accept = request.headers.get("Accept", "application/json, text/event-stream")
+    async with httpx.AsyncClient() as client:
+        async with client.stream(
+            request.method,
+            f"{BROWSER_MCP_URL}/mcp",
+            content=body or None,
+            headers={"Content-Type": "application/json", "Accept": accept},
+            timeout=None,
+        ) as resp:
+            content_type = resp.headers.get("content-type", "application/json")
+            if "text/event-stream" in content_type:
+                async def _stream():
+                    async for chunk in resp.aiter_bytes():
+                        yield chunk
+                return StreamingResponse(
+                    _stream(),
+                    media_type="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+                )
+            content = await resp.aread()
+            return Response(content=content, media_type=content_type, status_code=resp.status_code)
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="info")

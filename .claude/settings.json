@@ -4,7 +4,7 @@
       "type": "sse",
       "url": "http://66.245.217.76/sse"
     },
-    "browser": {
+    "playwright": {
       "type": "sse",
       "url": "http://66.245.217.76/browser-sse"
     }
