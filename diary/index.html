@@ -170,11 +170,17 @@
     }
 
     .toc-card {
+      display: block;
+      width: 100%;
+      text-align: left;
+      font-family: inherit;
       background: var(--paper);
       border: 1px solid var(--rule);
       border-left: 3px solid var(--gold);
       padding: 24px 28px;
       cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
       transition: border-color .2s, box-shadow .2s, transform .15s;
       box-shadow: 0 2px 12px rgba(61,43,31,.04);
     }
@@ -415,7 +421,7 @@ const entries = [
 /* ─── 构建目录卡片 ─── */
 const tocGrid = document.getElementById('toc-grid');
 entries.forEach((e, i) => {
-  const card = document.createElement('div');
+  const card = document.createElement('button');
   card.className = 'toc-card';
   card.onclick = () => openEntry(i);
   card.innerHTML = `
