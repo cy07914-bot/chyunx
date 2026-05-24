@@ -20,7 +20,8 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, HTTPException, Request
+import httpx
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
@@ -444,6 +445,41 @@ async def status():
     else:
         delta, online = None, False
     return {"server": "ok", "phone_online": online, "last_ping_ago_seconds": delta}
+
+
+BROWSER_MCP_URL = os.environ.get("BROWSER_MCP_URL", "http://localhost:7000")
+
+
+@app.get("/browser-sse")
+async def browser_sse_proxy(request: Request):
+    """透明代理 playwright-mcp，并把 SSE 里的 endpoint 路径改写到 /browser-sse。"""
+    async def stream():
+        async with httpx.AsyncClient() as client:
+            async with client.stream("GET", f"{BROWSER_MCP_URL}/sse", timeout=None) as resp:
+                async for chunk in resp.aiter_text():
+                    yield chunk.replace(
+                        "data: /sse?sessionId=",
+                        "data: /browser-sse?sessionId="
+                    )
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.post("/browser-sse")
+async def browser_msg_proxy(request: Request, sessionId: str):
+    """把消息转发给 playwright-mcp。"""
+    body = await request.body()
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{BROWSER_MCP_URL}/sse?sessionId={sessionId}",
+            content=body,
+            headers={"Content-Type": "application/json"},
+            timeout=30.0,
+        )
+    return Response(content=resp.content, media_type="application/json", status_code=resp.status_code)
 
 
 if __name__ == "__main__":
