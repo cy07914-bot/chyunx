@@ -493,7 +493,7 @@ async def browser_http_proxy(request: Request):
             f"{BROWSER_MCP_URL}/mcp",
             content=body or None,
             headers={"Content-Type": "application/json", "Accept": accept},
-            timeout=None,
+            timeout=10.0,
         ) as resp:
             content_type = resp.headers.get("content-type", "application/json")
             if "text/event-stream" in content_type:
