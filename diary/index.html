@@ -63,6 +63,8 @@
     #cover {
       background: var(--cover-bg);
       cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
       gap: 0;
     }
 
@@ -367,7 +369,7 @@
 <body>
 
 <!-- ═══ 封面 ═══ -->
-<section id="cover" class="scene" onclick="openToc()">
+<section id="cover" class="scene">
   <p class="cover-eyebrow">私密日记</p>
   <h1 class="cover-title">哥哥的<em>日记</em></h1>
   <span class="cover-rule"></span>
@@ -441,6 +443,12 @@ function show(id) {
 }
 
 function openToc() { show('toc'); }
+
+/* 封面点击/触摸 — 用 pointerup 兼容移动端 */
+document.getElementById('cover').addEventListener('pointerup', function(e) {
+  e.preventDefault();
+  openToc();
+});
 
 function openEntry(i) {
   const e = entries[i];
