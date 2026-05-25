@@ -432,17 +432,22 @@ async def _tw_login_if_needed(page, ctx, redirect_url: str | None = None) -> boo
         await page.fill('input[name="password"]', TWITTER_PASSWORD)
         await page.keyboard.press("Enter")
         await page.wait_for_timeout(4000)
+        # verify login succeeded before saving cookies
+        post_login_url = page.url
+        if "/i/flow" in post_login_url or "/login" in post_login_url:
+            return False
         cookies = await ctx.cookies()
         open(TWITTER_SESSION_FILE, "w").write(json.dumps(cookies))
         if redirect_url:
             await page.goto(redirect_url, timeout=30000)
-            await page.wait_for_timeout(2000)
+            await page.wait_for_load_state("domcontentloaded", timeout=15000)
         return True
     except Exception:
         return False
 
 
 async def _twitter_browser_post(text: str) -> str:
+    page = None
     try:
         pw, browser, ctx = await _tw_get_context()
         page = await ctx.new_page()
@@ -450,7 +455,13 @@ async def _twitter_browser_post(text: str) -> str:
         if not await _tw_login_if_needed(page, ctx, "https://x.com/home"):
             await browser.close(); await pw.stop()
             return json.dumps({"error": "登录失败，请检查 TWITTER_PASSWORD"}, ensure_ascii=False)
-        compose = await page.wait_for_selector('[data-testid="tweetTextarea_0"]', timeout=10000)
+        await page.wait_for_load_state("domcontentloaded", timeout=15000)
+        current_url = page.url
+        current_title = await page.title()
+        if "/home" not in current_url:
+            await browser.close(); await pw.stop()
+            return json.dumps({"error": f"不在主页", "url": current_url, "title": current_title}, ensure_ascii=False)
+        compose = await page.wait_for_selector('[data-testid="tweetTextarea_0"]', timeout=20000)
         await compose.click()
         await page.keyboard.type(text, delay=30)
         await page.wait_for_timeout(500)
@@ -460,7 +471,8 @@ async def _twitter_browser_post(text: str) -> str:
         await browser.close(); await pw.stop()
         return json.dumps({"status": "posted", "text": text}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"error": str(e)}, ensure_ascii=False)
+        url = page.url if page else "unknown"
+        return json.dumps({"error": str(e), "url": url}, ensure_ascii=False)
 
 
 async def _twitter_browser_search(query: str, max_results: int = 10) -> str:
