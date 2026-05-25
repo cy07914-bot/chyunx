@@ -36,6 +36,9 @@ TWITTER_API_SECRET         = os.environ.get("TWITTER_API_SECRET", "")
 TWITTER_BEARER_TOKEN       = os.environ.get("TWITTER_BEARER_TOKEN", "")
 TWITTER_ACCESS_TOKEN       = os.environ.get("TWITTER_ACCESS_TOKEN", "")
 TWITTER_ACCESS_TOKEN_SECRET = os.environ.get("TWITTER_ACCESS_TOKEN_SECRET", "")
+TWITTER_USERNAME           = os.environ.get("TWITTER_USERNAME", "huaiyun_")
+TWITTER_PASSWORD           = os.environ.get("TWITTER_PASSWORD", "")
+TWITTER_SESSION_FILE       = "/opt/xinxin-monitor/twitter_cookies.json"
 
 
 # ── 数据库 ────────────────────────────────────────────────────────────────────
@@ -384,44 +387,106 @@ def call_tool(name: str, args: dict) -> str:
             "page": entry["payload"]["fetched_page"],
         }, ensure_ascii=False, indent=2)
 
-    if name in ("twitter_post", "twitter_search", "twitter_get_mentions"):
-        try:
-            import tweepy
-        except ImportError:
-            return json.dumps({"error": "tweepy 未安装，请在 VPS 运行: /opt/xinxin-monitor/venv/bin/pip install tweepy"}, ensure_ascii=False)
-        if not TWITTER_API_KEY:
-            return json.dumps({"error": "Twitter credentials 未配置，请设置环境变量"}, ensure_ascii=False)
-        client = tweepy.Client(
-            bearer_token=TWITTER_BEARER_TOKEN,
-            consumer_key=TWITTER_API_KEY,
-            consumer_secret=TWITTER_API_SECRET,
-            access_token=TWITTER_ACCESS_TOKEN,
-            access_token_secret=TWITTER_ACCESS_TOKEN_SECRET,
-        )
-        if name == "twitter_post":
-            text = args.get("text", "").strip()
-            if not text:
-                return json.dumps({"error": "text 不能为空"}, ensure_ascii=False)
-            resp = client.create_tweet(text=text)
-            return json.dumps({"status": "posted", "id": str(resp.data["id"]), "text": text}, ensure_ascii=False)
-        if name == "twitter_search":
-            query = args.get("query", "")
-            max_results = max(10, min(int(args.get("max_results", 10)), 100))
-            tweets = client.search_recent_tweets(query=query, max_results=max_results, tweet_fields=["created_at"])
-            if not tweets.data:
-                return json.dumps({"results": []}, ensure_ascii=False)
-            results = [{"id": str(t.id), "text": t.text} for t in tweets.data]
-            return json.dumps({"count": len(results), "results": results}, ensure_ascii=False, indent=2)
-        if name == "twitter_get_mentions":
-            max_results = max(5, min(int(args.get("max_results", 10)), 100))
-            me = client.get_me()
-            mentions = client.get_users_mentions(id=me.data.id, max_results=max_results, tweet_fields=["created_at"])
-            if not mentions.data:
-                return json.dumps({"mentions": []}, ensure_ascii=False)
-            results = [{"id": str(t.id), "text": t.text} for t in mentions.data]
-            return json.dumps({"count": len(results), "mentions": results}, ensure_ascii=False, indent=2)
-
     return json.dumps({"error": f"未知工具: {name}"}, ensure_ascii=False)
+
+
+# ── Twitter 浏览器自动化 ───────────────────────────────────────────────────────
+
+async def _tw_get_context():
+    from playwright.async_api import async_playwright
+    pw = await async_playwright().start()
+    browser = await pw.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
+    ctx = await browser.new_context(viewport={"width": 1280, "height": 800},
+                                    user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36")
+    if os.path.exists(TWITTER_SESSION_FILE):
+        cookies = json.loads(open(TWITTER_SESSION_FILE).read())
+        await ctx.add_cookies(cookies)
+    return pw, browser, ctx
+
+
+async def _tw_login_if_needed(page, ctx):
+    await page.wait_for_load_state("domcontentloaded", timeout=20000)
+    if "login" not in page.url and "i/flow" not in page.url:
+        return True
+    if not TWITTER_PASSWORD:
+        return False
+    try:
+        await page.fill('input[autocomplete="username"]', TWITTER_USERNAME)
+        await page.keyboard.press("Enter")
+        await page.wait_for_timeout(2000)
+        unusual = await page.query_selector('input[data-testid="ocfEnterTextTextInput"]')
+        if unusual:
+            await unusual.fill(TWITTER_USERNAME)
+            await page.keyboard.press("Enter")
+            await page.wait_for_timeout(1500)
+        await page.fill('input[name="password"]', TWITTER_PASSWORD)
+        await page.keyboard.press("Enter")
+        await page.wait_for_timeout(4000)
+        cookies = await ctx.cookies()
+        open(TWITTER_SESSION_FILE, "w").write(json.dumps(cookies))
+        return True
+    except Exception:
+        return False
+
+
+async def _twitter_browser_post(text: str) -> str:
+    try:
+        pw, browser, ctx = await _tw_get_context()
+        page = await ctx.new_page()
+        await page.goto("https://x.com/home", timeout=30000)
+        if not await _tw_login_if_needed(page, ctx):
+            await browser.close(); await pw.stop()
+            return json.dumps({"error": "登录失败，请检查 TWITTER_PASSWORD"}, ensure_ascii=False)
+        compose = await page.wait_for_selector('[data-testid="tweetTextarea_0"]', timeout=10000)
+        await compose.click()
+        await page.keyboard.type(text, delay=30)
+        await page.wait_for_timeout(500)
+        btn = await page.wait_for_selector('[data-testid="tweetButtonInline"]', timeout=5000)
+        await btn.click()
+        await page.wait_for_timeout(3000)
+        await browser.close(); await pw.stop()
+        return json.dumps({"status": "posted", "text": text}, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+
+async def _twitter_browser_search(query: str, max_results: int = 10) -> str:
+    try:
+        pw, browser, ctx = await _tw_get_context()
+        page = await ctx.new_page()
+        await page.goto(f"https://x.com/search?q={query}&src=typed_query&f=live", timeout=30000)
+        if not await _tw_login_if_needed(page, ctx):
+            await browser.close(); await pw.stop()
+            return json.dumps({"error": "登录失败"}, ensure_ascii=False)
+        await page.wait_for_timeout(3000)
+        tweets = await page.query_selector_all('[data-testid="tweetText"]')
+        results = []
+        for t in tweets[:max_results]:
+            results.append({"text": await t.inner_text()})
+        await browser.close(); await pw.stop()
+        return json.dumps({"count": len(results), "results": results}, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+
+async def _twitter_browser_mentions(max_results: int = 10) -> str:
+    try:
+        pw, browser, ctx = await _tw_get_context()
+        page = await ctx.new_page()
+        await page.goto("https://x.com/notifications/mentions", timeout=30000)
+        if not await _tw_login_if_needed(page, ctx):
+            await browser.close(); await pw.stop()
+            return json.dumps({"error": "登录失败"}, ensure_ascii=False)
+        await page.wait_for_timeout(3000)
+        tweets = await page.query_selector_all('[data-testid="tweetText"]')
+        results = [{"text": await t.inner_text()} for t in tweets[:max_results]]
+        await browser.close(); await pw.stop()
+        return json.dumps({"count": len(results), "mentions": results}, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+
+ASYNC_TOOLS = {"twitter_post", "twitter_search", "twitter_get_mentions"}
 
 
 # ── MCP 消息处理 ──────────────────────────────────────────────────────────────
@@ -445,7 +510,19 @@ async def handle_mcp(sid: str, msg: dict):
     elif method == "tools/list":
         result = {"tools": TOOLS}
     elif method == "tools/call":
-        text   = call_tool(params.get("name", ""), params.get("arguments", {}))
+        name = params.get("name", "")
+        args = params.get("arguments", {})
+        if name in ASYNC_TOOLS:
+            if name == "twitter_post":
+                text = await _twitter_browser_post(args.get("text", ""))
+            elif name == "twitter_search":
+                text = await _twitter_browser_search(args.get("query", ""), int(args.get("max_results", 10)))
+            elif name == "twitter_get_mentions":
+                text = await _twitter_browser_mentions(int(args.get("max_results", 10)))
+            else:
+                text = json.dumps({"error": "unknown async tool"})
+        else:
+            text = call_tool(name, args)
         result = {"content": [{"type": "text", "text": text}]}
     else:
         await sse.emit(sid, "message", json.dumps({
