@@ -559,7 +559,7 @@ async def get_weather_text() -> str:
     try:
         async with httpx.AsyncClient() as client:
             r = await client.get(
-                f"https://wttr.in/{WEATHER_CITY}?format=3",
+                f"https://wttr.in/{WEATHER_CITY}?format=3&m",
                 headers={"Accept-Language": "zh-CN"},
                 timeout=10,
             )
