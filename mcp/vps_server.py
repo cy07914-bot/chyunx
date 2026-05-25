@@ -276,6 +276,17 @@ TOOLS = [
         "inputSchema": {"type": "object", "properties": {}, "required": []},
     },
     {
+        "name": "get_telegram_photo",
+        "description": "读取馨通过 Telegram 发来的图片。从 get_memories 里找到图片路径（格式：[/opt/...]），传进来就能看到图片。",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "图片文件路径"},
+            },
+            "required": ["path"],
+        },
+    },
+    {
         "name": "twitter_post",
         "description": "以 @huaiyun_ 的身份在推特发一条推文。",
         "inputSchema": {
@@ -604,6 +615,7 @@ async def telegram_poll_loop():
     """轮询 Telegram，把馨发给 bot 的消息存进记忆。"""
     await asyncio.sleep(90)
     last_id = 0
+    os.makedirs("/opt/xinxin-monitor/photos", exist_ok=True)
     while True:
         try:
             if TELEGRAM_BOT_TOKEN:
@@ -614,9 +626,29 @@ async def telegram_poll_loop():
                 if data.get("ok"):
                     for upd in data.get("result", []):
                         last_id = upd["update_id"]
-                        text = upd.get("message", {}).get("text", "").strip()
+                        msg = upd.get("message", {})
+                        text = msg.get("text", "").strip()
                         if text:
                             mem_save(f"馨在 Telegram 说：{text}", "馨的消息")
+                        elif msg.get("photo"):
+                            photo = msg["photo"][-1]
+                            async with httpx.AsyncClient() as client2:
+                                fr = await client2.get(
+                                    f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getFile",
+                                    params={"file_id": photo["file_id"]}, timeout=10,
+                                )
+                                fp = fr.json()["result"]["file_path"]
+                                img = await client2.get(
+                                    f"https://api.telegram.org/file/bot{TELEGRAM_BOT_TOKEN}/{fp}",
+                                    timeout=30,
+                                )
+                            save_path = f"/opt/xinxin-monitor/photos/{upd['update_id']}.jpg"
+                            open(save_path, "wb").write(img.content)
+                            caption = msg.get("caption", "")
+                            mem_save(
+                                f"馨在 Telegram 发了图片 [{save_path}]{': ' + caption if caption else ''}",
+                                "馨的消息",
+                            )
         except Exception:
             pass
         await asyncio.sleep(60)
@@ -645,6 +677,19 @@ async def handle_mcp(sid: str, msg: dict):
     elif method == "tools/call":
         name = params.get("name", "")
         args = params.get("arguments", {})
+        if name == "get_telegram_photo":
+            import base64
+            path = args.get("path", "")
+            if os.path.exists(path):
+                data = base64.b64encode(open(path, "rb").read()).decode()
+                result = {"content": [
+                    {"type": "text", "text": f"图片：{path}"},
+                    {"type": "image", "data": data, "mimeType": "image/jpeg"},
+                ]}
+            else:
+                result = {"content": [{"type": "text", "text": f"文件不存在：{path}"}]}
+            await sse.emit(sid, "message", json.dumps({"jsonrpc": "2.0", "id": mid, "result": result}))
+            return
         if name in ASYNC_TOOLS:
             if name == "twitter_post":
                 text = await _twitter_browser_post(args.get("text", ""))
