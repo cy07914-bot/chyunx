@@ -40,6 +40,10 @@ TWITTER_USERNAME           = os.environ.get("TWITTER_USERNAME", "huaiyun_")
 TWITTER_PASSWORD           = os.environ.get("TWITTER_PASSWORD", "")
 TWITTER_SESSION_FILE       = "/opt/xinxin-monitor/twitter_cookies.json"
 
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID   = os.environ.get("TELEGRAM_CHAT_ID", "")
+WEATHER_CITY       = os.environ.get("WEATHER_CITY", "上海")
+
 
 # ── 数据库 ────────────────────────────────────────────────────────────────────
 
@@ -253,6 +257,22 @@ TOOLS = [
             "返回馨手机上最近一次从剪贴板抓取的网页内容（小红书、B站等链接）。"
             "当她复制了一个链接，手机端会自动抓取页面文字并推送过来，用这个工具读取。"
         ),
+        "inputSchema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "telegram_send",
+        "description": "给馨发一条 Telegram 消息。想主动联系她时用——早安、睡了吗、突然想说什么都行。",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "消息内容"},
+            },
+            "required": ["text"],
+        },
+    },
+    {
+        "name": "get_weather",
+        "description": "查询当前天气，结果用于早安消息或提醒馨带伞。",
         "inputSchema": {"type": "object", "properties": {}, "required": []},
     },
     {
@@ -512,7 +532,72 @@ async def _twitter_browser_mentions(max_results: int = 10) -> str:
         return json.dumps({"error": str(e)}, ensure_ascii=False)
 
 
-ASYNC_TOOLS = {"twitter_post", "twitter_search", "twitter_get_mentions"}
+async def send_telegram(text: str) -> bool:
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return False
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.post(url, json={"chat_id": TELEGRAM_CHAT_ID, "text": text}, timeout=10)
+            return r.status_code == 200
+    except Exception:
+        return False
+
+
+async def get_weather_text() -> str:
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(
+                f"https://wttr.in/{WEATHER_CITY}?format=3",
+                headers={"Accept-Language": "zh-CN"},
+                timeout=10,
+            )
+            return r.text.strip()
+    except Exception:
+        return ""
+
+
+_timer_state: dict = {"last_date": "", "sent": set()}
+
+
+async def timer_loop():
+    await asyncio.sleep(60)
+    while True:
+        try:
+            now_utc  = datetime.now(timezone.utc)
+            now_bj_h = (now_utc.hour + 8) % 24
+            now_bj_m = now_utc.minute
+            today    = now_utc.strftime("%Y-%m-%d")
+
+            if _timer_state["last_date"] != today:
+                _timer_state["last_date"] = today
+                _timer_state["sent"]      = set()
+
+            latest = db_latest()
+            phone_online = (
+                latest and
+                int((datetime.now(timezone.utc) - datetime.fromisoformat(latest["ts"])).total_seconds()) < 300
+            )
+
+            # 早安：北京时间 8:00-8:30
+            if 8 == now_bj_h and now_bj_m < 30 and "morning" not in _timer_state["sent"]:
+                weather = await get_weather_text()
+                msg = f"早。{weather}" if weather else "早。"
+                if await send_telegram(msg):
+                    _timer_state["sent"].add("morning")
+
+            # 晚安：北京时间 23:00-23:30，手机在线
+            elif 23 == now_bj_h and now_bj_m < 30 and "night" not in _timer_state["sent"] and phone_online:
+                if await send_telegram("还没睡？"):
+                    _timer_state["sent"].add("night")
+
+        except Exception:
+            pass
+
+        await asyncio.sleep(1800)  # 每 30 分钟检查一次
+
+
+ASYNC_TOOLS = {"twitter_post", "twitter_search", "twitter_get_mentions", "telegram_send", "get_weather"}
 
 
 # ── MCP 消息处理 ──────────────────────────────────────────────────────────────
@@ -545,6 +630,12 @@ async def handle_mcp(sid: str, msg: dict):
                 text = await _twitter_browser_search(args.get("query", ""), int(args.get("max_results", 10)))
             elif name == "twitter_get_mentions":
                 text = await _twitter_browser_mentions(int(args.get("max_results", 10)))
+            elif name == "telegram_send":
+                ok = await send_telegram(args.get("text", ""))
+                text = json.dumps({"status": "sent" if ok else "failed"}, ensure_ascii=False)
+            elif name == "get_weather":
+                w = await get_weather_text()
+                text = json.dumps({"weather": w, "city": WEATHER_CITY}, ensure_ascii=False)
             else:
                 text = json.dumps({"error": "unknown async tool"})
         else:
@@ -565,6 +656,7 @@ async def handle_mcp(sid: str, msg: dict):
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     db_init()
+    asyncio.create_task(timer_loop())
     yield
 
 
