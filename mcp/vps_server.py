@@ -832,6 +832,8 @@ async def lifespan(_app: FastAPI):
     yield
 
 
+ADMIN_KEY = os.environ.get("ADMIN_KEY", "")
+
 app = FastAPI(title="xinxin-monitor", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
@@ -877,6 +879,25 @@ async def recv_phone_data(request: Request):
         raise HTTPException(401, "Invalid API key")
     db_insert(await request.json())
     return {"status": "ok"}
+
+
+@app.post("/admin/update")
+async def admin_update(request: Request):
+    key = request.headers.get("X-Admin-Key", "")
+    if not ADMIN_KEY or key != ADMIN_KEY:
+        raise HTTPException(403, "Forbidden")
+    url = "https://raw.githubusercontent.com/cy07914-bot/chyunx/main/mcp/vps_server.py"
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(url, timeout=30)
+        if r.status_code != 200:
+            return {"status": "error", "detail": f"GitHub returned {r.status_code}"}
+        open("/opt/xinxin-monitor/vps_server.py", "w").write(r.text)
+        import subprocess
+        subprocess.Popen(["systemctl", "restart", "xinxin-monitor"])
+        return {"status": "ok", "bytes": len(r.text)}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
 
 
 @app.get("/status")
