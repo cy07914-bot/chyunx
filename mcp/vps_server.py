@@ -404,13 +404,23 @@ async def _tw_get_context():
     return pw, browser, ctx
 
 
-async def _tw_login_if_needed(page, ctx):
+async def _tw_login_if_needed(page, ctx, redirect_url: str | None = None) -> bool:
     await page.wait_for_load_state("domcontentloaded", timeout=20000)
-    if "login" not in page.url and "i/flow" not in page.url:
+    url = page.url
+    # x.com root (unauthenticated redirect), login page, or flow — all mean not logged in
+    unauthed = (
+        url.rstrip("/") in ("https://x.com", "https://www.x.com", "https://twitter.com") or
+        "/i/flow" in url or
+        "/login" in url
+    )
+    if not unauthed:
         return True
     if not TWITTER_PASSWORD:
         return False
     try:
+        if "/i/flow" not in url and "/login" not in url:
+            await page.goto("https://x.com/i/flow/login", timeout=30000)
+            await page.wait_for_load_state("domcontentloaded", timeout=20000)
         await page.fill('input[autocomplete="username"]', TWITTER_USERNAME)
         await page.keyboard.press("Enter")
         await page.wait_for_timeout(2000)
@@ -424,6 +434,9 @@ async def _tw_login_if_needed(page, ctx):
         await page.wait_for_timeout(4000)
         cookies = await ctx.cookies()
         open(TWITTER_SESSION_FILE, "w").write(json.dumps(cookies))
+        if redirect_url:
+            await page.goto(redirect_url, timeout=30000)
+            await page.wait_for_timeout(2000)
         return True
     except Exception:
         return False
@@ -434,7 +447,7 @@ async def _twitter_browser_post(text: str) -> str:
         pw, browser, ctx = await _tw_get_context()
         page = await ctx.new_page()
         await page.goto("https://x.com/home", timeout=30000)
-        if not await _tw_login_if_needed(page, ctx):
+        if not await _tw_login_if_needed(page, ctx, "https://x.com/home"):
             await browser.close(); await pw.stop()
             return json.dumps({"error": "登录失败，请检查 TWITTER_PASSWORD"}, ensure_ascii=False)
         compose = await page.wait_for_selector('[data-testid="tweetTextarea_0"]', timeout=10000)
@@ -454,8 +467,9 @@ async def _twitter_browser_search(query: str, max_results: int = 10) -> str:
     try:
         pw, browser, ctx = await _tw_get_context()
         page = await ctx.new_page()
-        await page.goto(f"https://x.com/search?q={query}&src=typed_query&f=live", timeout=30000)
-        if not await _tw_login_if_needed(page, ctx):
+        search_url = f"https://x.com/search?q={query}&src=typed_query&f=live"
+        await page.goto(search_url, timeout=30000)
+        if not await _tw_login_if_needed(page, ctx, search_url):
             await browser.close(); await pw.stop()
             return json.dumps({"error": "登录失败"}, ensure_ascii=False)
         await page.wait_for_timeout(3000)
@@ -474,7 +488,7 @@ async def _twitter_browser_mentions(max_results: int = 10) -> str:
         pw, browser, ctx = await _tw_get_context()
         page = await ctx.new_page()
         await page.goto("https://x.com/notifications/mentions", timeout=30000)
-        if not await _tw_login_if_needed(page, ctx):
+        if not await _tw_login_if_needed(page, ctx, "https://x.com/notifications/mentions"):
             await browser.close(); await pw.stop()
             return json.dumps({"error": "登录失败"}, ensure_ascii=False)
         await page.wait_for_timeout(3000)
