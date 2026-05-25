@@ -665,13 +665,17 @@ async def get_ai_news_text(limit: int = 5) -> str:
     import xml.etree.ElementTree as ET
     feeds = [
         ("量子位", "https://www.qbitai.com/feed"),
-        ("36氪", "https://36kr.com/feed"),
+        ("机器之心", "https://www.jiqizhixin.com/rss.xml"),
     ]
     all_news = []
-    async with httpx.AsyncClient(follow_redirects=False) as client:
+    headers = {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36",
+        "Accept": "application/rss+xml, application/xml, text/xml, */*",
+    }
+    async with httpx.AsyncClient(follow_redirects=True, timeout=20) as client:
         for source, url in feeds:
             try:
-                r = await client.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
+                r = await client.get(url, headers=headers)
                 if r.status_code != 200:
                     all_news.append({"source": source, "error": f"HTTP {r.status_code}"})
                     continue
