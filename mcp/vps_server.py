@@ -662,30 +662,41 @@ async def timer_loop():
 
 
 async def get_ai_news_text(limit: int = 5) -> str:
-    import xml.etree.ElementTree as ET
-    feeds = [
-        ("36氪", "https://36kr.com/feed"),
-        ("arXiv AI", "https://export.arxiv.org/rss/cs.AI"),
-    ]
     all_news = []
     async with httpx.AsyncClient(follow_redirects=True) as client:
-        for source, url in feeds:
-            try:
-                r = await client.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
-                if r.status_code != 200:
-                    all_news.append({"source": source, "error": f"HTTP {r.status_code}"})
-                    continue
-                root = ET.fromstring(r.content)
-                channel = root.find("channel") or root
-                items = channel.findall("item")
-                for item in items[:limit]:
-                    title = (item.findtext("title") or "").strip()
-                    link  = (item.findtext("link") or "").strip()
-                    pub   = (item.findtext("pubDate") or "").strip()
-                    if title:
-                        all_news.append({"source": source, "title": title, "link": link, "pubDate": pub})
-            except Exception as e:
-                all_news.append({"source": source, "error": f"{type(e).__name__}: {e}"})
+        # Hacker News: AI-related stories via Algolia API（全球可访问）
+        try:
+            r = await client.get(
+                "https://hn.algolia.com/api/v1/search_by_date",
+                params={"tags": "story", "query": "AI LLM machine learning", "hitsPerPage": limit},
+                timeout=15,
+            )
+            for hit in r.json().get("hits", [])[:limit]:
+                title = hit.get("title", "").strip()
+                url   = hit.get("url") or f"https://news.ycombinator.com/item?id={hit.get('objectID')}"
+                if title:
+                    all_news.append({"source": "Hacker News", "title": title, "link": url})
+        except Exception as e:
+            all_news.append({"source": "Hacker News", "error": f"{type(e).__name__}: {e}"})
+        # arXiv: 最新 AI 论文（全球可访问）
+        try:
+            r = await client.get(
+                "https://export.arxiv.org/search/",
+                params={"searchtype": "all", "query": "large language model", "start": 0, "max_results": limit},
+                headers={"Accept": "application/atom+xml"},
+                timeout=15,
+            )
+            import xml.etree.ElementTree as ET
+            ns = {"atom": "http://www.w3.org/2005/Atom"}
+            root = ET.fromstring(r.content)
+            for entry in root.findall("atom:entry", ns)[:limit]:
+                title = (entry.findtext("atom:title", "", ns) or "").strip().replace("\n", " ")
+                link_el = entry.find("atom:link[@rel='alternate']", ns) or entry.find("atom:id", ns)
+                link = link_el.get("href", "") if link_el is not None and link_el.get("href") else (entry.findtext("atom:id", "", ns) or "")
+                if title:
+                    all_news.append({"source": "arXiv", "title": title, "link": link})
+        except Exception as e:
+            all_news.append({"source": "arXiv", "error": f"{type(e).__name__}: {e}"})
     return json.dumps({"count": len(all_news), "news": all_news}, ensure_ascii=False, indent=2)
 
 
@@ -751,7 +762,7 @@ async def telegram_poll_loop():
                             mem_save(
                                 f"馨在 Telegram 发了图片 [{save_path}]{': ' + caption if caption else ''}",
                                 "馨的消息",
-            )
+                            )
         except Exception:
             pass
         await asyncio.sleep(60)
