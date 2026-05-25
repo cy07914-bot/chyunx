@@ -579,10 +579,16 @@ async def get_weather_text() -> str:
         return ""
 
 
-_timer_state: dict = {"last_date": "", "sent": set()}
+_timer_state: dict = {"last_date": "", "sent": set(), "last_msg_ts": 0, "last_weibo_ts": 0}
+
+_CASUAL_MSGS = [
+    "在干嘛呢。", "想你了。", "有在吗。", "你还好吗。",
+    "闲着没事找你说话。", "突然想到你。", "馨。", "喂。",
+]
 
 
 async def timer_loop():
+    import random, time
     await asyncio.sleep(60)
     while True:
         try:
@@ -590,6 +596,7 @@ async def timer_loop():
             now_bj_h = (now_utc.hour + 8) % 24
             now_bj_m = now_utc.minute
             today    = now_utc.strftime("%Y-%m-%d")
+            now_ts   = now_utc.timestamp()
 
             if _timer_state["last_date"] != today:
                 _timer_state["last_date"] = today
@@ -601,22 +608,46 @@ async def timer_loop():
                 int((datetime.now(timezone.utc) - datetime.fromisoformat(latest["ts"])).total_seconds()) < 300
             )
 
-            # 早安：北京时间 8:00-8:30
+            # 早安：8:00-8:30
             if 8 == now_bj_h and now_bj_m < 30 and "morning" not in _timer_state["sent"]:
                 weather = await get_weather_text()
                 msg = f"早。{weather}" if weather else "早。"
                 if await send_telegram(msg):
                     _timer_state["sent"].add("morning")
+                    _timer_state["last_msg_ts"] = now_ts
 
-            # 晚安：北京时间 23:00-23:30，手机在线
+            # 晚安：23:00-23:30，手机在线
             elif 23 == now_bj_h and now_bj_m < 30 and "night" not in _timer_state["sent"] and phone_online:
                 if await send_telegram("还没睡？"):
                     _timer_state["sent"].add("night")
+                    _timer_state["last_msg_ts"] = now_ts
+
+            # 每 1-2 小时随机找她说话（10:00-22:00，手机在线）
+            elif 10 <= now_bj_h < 22 and phone_online:
+                since_last = now_ts - _timer_state["last_msg_ts"]
+                slot = f"hourly_{now_bj_h}"
+                if since_last >= 3600 and slot not in _timer_state["sent"]:
+                    if random.random() < 0.6:  # 60% 概率发，不是每小时都打扰
+                        if await send_telegram(random.choice(_CASUAL_MSGS)):
+                            _timer_state["sent"].add(slot)
+                            _timer_state["last_msg_ts"] = now_ts
+
+            # 每 4 小时抓一次微博热搜存进记忆
+            if now_ts - _timer_state["last_weibo_ts"] >= 14400:
+                try:
+                    trending_json = await get_weibo_trending_text(10)
+                    trending = json.loads(trending_json).get("trending", [])
+                    if trending:
+                        summary = "微博热搜（自动更新）：\n" + "\n".join(trending[:10])
+                        mem_save(summary, "热搜")
+                        _timer_state["last_weibo_ts"] = now_ts
+                except Exception:
+                    pass
 
         except Exception:
             pass
 
-        await asyncio.sleep(1800)  # 每 30 分钟检查一次
+        await asyncio.sleep(1800)
 
 
 async def get_weibo_trending_text(limit: int = 20) -> str:
