@@ -287,6 +287,17 @@ TOOLS = [
         },
     },
     {
+        "name": "get_weibo_trending",
+        "description": "获取微博实时热搜榜，看看大家今天在聊什么。",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer", "description": "返回条数，默认20", "default": 20},
+            },
+            "required": [],
+        },
+    },
+    {
         "name": "twitter_post",
         "description": "以 @huaiyun_ 的身份在推特发一条推文。",
         "inputSchema": {
@@ -608,7 +619,29 @@ async def timer_loop():
         await asyncio.sleep(1800)  # 每 30 分钟检查一次
 
 
-ASYNC_TOOLS = {"twitter_post", "twitter_search", "twitter_get_mentions", "telegram_send", "get_weather"}
+async def get_weibo_trending_text(limit: int = 20) -> str:
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(
+                "https://weibo.com/ajax/side/hotSearch",
+                headers={"User-Agent": "Mozilla/5.0", "Referer": "https://weibo.com/"},
+                timeout=10,
+            )
+            data = r.json()
+        items = data.get("data", {}).get("realtime", [])[:limit]
+        result = []
+        for i, it in enumerate(items, 1):
+            word = it.get("word", "")
+            hot  = it.get("raw_hot", "")
+            label = it.get("label_name", "")
+            tag = f"[{label}]" if label else ""
+            result.append(f"{i}. {word}{tag}  {hot}")
+        return json.dumps({"count": len(result), "trending": result}, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+
+ASYNC_TOOLS = {"twitter_post", "twitter_search", "twitter_get_mentions", "telegram_send", "get_weather", "get_weibo_trending"}
 
 
 async def telegram_poll_loop():
@@ -703,6 +736,8 @@ async def handle_mcp(sid: str, msg: dict):
             elif name == "get_weather":
                 w = await get_weather_text()
                 text = json.dumps({"weather": w, "city": WEATHER_CITY}, ensure_ascii=False)
+            elif name == "get_weibo_trending":
+                text = await get_weibo_trending_text(int(args.get("limit", 20)))
             else:
                 text = json.dumps({"error": "unknown async tool"})
         else:
