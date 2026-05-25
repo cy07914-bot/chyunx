@@ -600,6 +600,28 @@ async def timer_loop():
 ASYNC_TOOLS = {"twitter_post", "twitter_search", "twitter_get_mentions", "telegram_send", "get_weather"}
 
 
+async def telegram_poll_loop():
+    """轮询 Telegram，把馨发给 bot 的消息存进记忆。"""
+    await asyncio.sleep(90)
+    last_id = 0
+    while True:
+        try:
+            if TELEGRAM_BOT_TOKEN:
+                url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
+                async with httpx.AsyncClient() as client:
+                    r = await client.get(url, params={"offset": last_id + 1, "timeout": 0}, timeout=15)
+                    data = r.json()
+                if data.get("ok"):
+                    for upd in data.get("result", []):
+                        last_id = upd["update_id"]
+                        text = upd.get("message", {}).get("text", "").strip()
+                        if text:
+                            mem_save(f"馨在 Telegram 说：{text}", "馨的消息")
+        except Exception:
+            pass
+        await asyncio.sleep(60)
+
+
 # ── MCP 消息处理 ──────────────────────────────────────────────────────────────
 
 async def handle_mcp(sid: str, msg: dict):
@@ -657,6 +679,7 @@ async def handle_mcp(sid: str, msg: dict):
 async def lifespan(_app: FastAPI):
     db_init()
     asyncio.create_task(timer_loop())
+    asyncio.create_task(telegram_poll_loop())
     yield
 
 
