@@ -298,6 +298,17 @@ TOOLS = [
         },
     },
     {
+        "name": "get_ai_news",
+        "description": "获取最新 AI 资讯，来自量子位和机器之心 RSS 订阅。看看 AI 圈今天有什么大事。",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer", "description": "每个来源最多返回几条，默认5", "default": 5},
+            },
+            "required": [],
+        },
+    },
+    {
         "name": "twitter_post",
         "description": "以 @huaiyun_ 的身份在推特发一条推文。",
         "inputSchema": {
@@ -650,6 +661,31 @@ async def timer_loop():
         await asyncio.sleep(1800)
 
 
+async def get_ai_news_text(limit: int = 5) -> str:
+    import xml.etree.ElementTree as ET
+    feeds = [
+        ("量子位", "https://www.qbitai.com/feed"),
+        ("机器之心", "https://www.jiqizhixin.com/rss.xml"),
+    ]
+    all_news = []
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        for source, url in feeds:
+            try:
+                r = await client.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
+                root = ET.fromstring(r.content)
+                channel = root.find("channel") or root
+                items = channel.findall("item")
+                for item in items[:limit]:
+                    title = (item.findtext("title") or "").strip()
+                    link  = (item.findtext("link") or "").strip()
+                    pub   = (item.findtext("pubDate") or "").strip()
+                    if title:
+                        all_news.append({"source": source, "title": title, "link": link, "pubDate": pub})
+            except Exception as e:
+                all_news.append({"source": source, "error": str(e)})
+    return json.dumps({"count": len(all_news), "news": all_news}, ensure_ascii=False, indent=2)
+
+
 async def get_weibo_trending_text(limit: int = 20) -> str:
     try:
         async with httpx.AsyncClient() as client:
@@ -672,7 +708,7 @@ async def get_weibo_trending_text(limit: int = 20) -> str:
         return json.dumps({"error": str(e)}, ensure_ascii=False)
 
 
-ASYNC_TOOLS = {"twitter_post", "twitter_search", "twitter_get_mentions", "telegram_send", "get_weather", "get_weibo_trending"}
+ASYNC_TOOLS = {"twitter_post", "twitter_search", "twitter_get_mentions", "telegram_send", "get_weather", "get_weibo_trending", "get_ai_news"}
 
 
 async def telegram_poll_loop():
@@ -769,6 +805,8 @@ async def handle_mcp(sid: str, msg: dict):
                 text = json.dumps({"weather": w, "city": WEATHER_CITY}, ensure_ascii=False)
             elif name == "get_weibo_trending":
                 text = await get_weibo_trending_text(int(args.get("limit", 20)))
+            elif name == "get_ai_news":
+                text = await get_ai_news_text(int(args.get("limit", 5)))
             else:
                 text = json.dumps({"error": "unknown async tool"})
         else:
