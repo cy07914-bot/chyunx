@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>✨ 专属心动表白 ✨</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', 'Poppins', 'Dancing Script', 'Microsoft YaHei', cursive, sans-serif;
+            color: #fff;
+            background: radial-gradient(circle at center, #1a0b1f 0%, #0a0510 100%);
+        }
+        .heart-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+            overflow: hidden;
+        }
+        .love-card {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 20;
+            text-align: center;
+            background: rgba(20, 5, 30, 0.65);
+            backdrop-filter: blur(12px);
+            border-radius: 60px 40px 60px 40px;
+            padding: 2rem 2.5rem;
+            border: 1px solid rgba(255, 120, 160, 0.6);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(255, 80, 120, 0.3);
+            transition: all 0.4s ease;
+            min-width: 280px;
+            width: auto;
+            max-width: 85vw;
+            animation: floatGlow 3s infinite alternate;
+        }
+        @keyframes floatGlow {
+            0% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 20px rgba(255, 80, 120, 0.3);}
+            100% { transform: translate(-50%, -52%) scale(1.02); box-shadow: 0 0 40px rgba(255, 100, 150, 0.6);}
+        }
+        .love-card h1 {
+            font-size: 2.8rem;
+            margin: 0 0 0.5rem;
+            background: linear-gradient(135deg, #FFB6C1, #FF4D6D, #FF1493);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            text-shadow: 0 0 8px rgba(255, 80, 120, 0.5);
+            letter-spacing: 2px;
+        }
+        .love-card .greeting {
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+            color: #FFD9E6;
+            font-weight: 300;
+        }
+        .name-input {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid #ff99bb;
+            border-radius: 40px;
+            padding: 8px 18px;
+            font-size: 1rem;
+            color: white;
+            text-align: center;
+            outline: none;
+            width: 70%;
+            margin-bottom: 1.2rem;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+        .name-input:focus {
+            border-color: #ff4d6d;
+            box-shadow: 0 0 12px #ff4d6d;
+            background: rgba(0,0,0,0.4);
+        }
+        .question {
+            font-size: 1.6rem;
+            margin: 0.8rem 0 1.8rem;
+            font-weight: bold;
+            color: #fff0f5;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        .buttons {
+            display: flex;
+            gap: 25px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .btn {
+            border: none;
+            padding: 12px 32px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            border-radius: 60px;
+            cursor: pointer;
+            transition: 0.2s all;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            font-family: inherit;
+        }
+        .btn-yes {
+            background: linear-gradient(45deg, #ff4d6d, #ff85a1);
+            color: white;
+            border: 1px solid #ffb3c6;
+        }
+        .btn-yes:hover {
+            transform: scale(1.08);
+            background: linear-gradient(45deg, #ff1e4d, #ff6b8f);
+            box-shadow: 0 0 20px #ff4d6d;
+        }
+        .btn-no {
+            background: rgba(80, 60, 80, 0.8);
+            backdrop-filter: blur(5px);
+            color: #ffe0e7;
+            border: 1px solid #ff99bb;
+        }
+        .btn-no:hover {
+            background: #663d52;
+            transform: scale(0.96);
+        }
+        .message-area {
+            margin-top: 25px;
+            font-size: 1.2rem;
+            min-height: 65px;
+            color: #FFD966;
+            text-shadow: 0 0 5px #ff3366;
+            font-weight: 500;
+            transition: 0.3s;
+        }
+        .signature {
+            position: fixed;
+            bottom: 15px;
+            right: 20px;
+            z-index: 20;
+            font-size: 0.75rem;
+            opacity: 0.6;
+            color: #ffb7c5;
+            background: rgba(0,0,0,0.3);
+            padding: 5px 10px;
+            border-radius: 30px;
+            pointer-events: none;
+            font-family: monospace;
+        }
+        @media (max-width: 600px) {
+            .love-card { padding: 1.5rem; width: 80vw; }
+            .love-card h1 { font-size: 2rem; }
+            .question { font-size: 1.2rem; }
+            .btn { padding: 8px 20px; font-size: 1rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="heart-bg" id="floatingHearts"></div>
+
+<div class="love-card" id="loveCard">
+    <h1>💖 心动序章 💖</h1>
+    <div class="greeting">✨ 致 · 特别的你 ✨</div>
+    <input type="text" id="targetName" class="name-input" placeholder="她的/他的名字" value="我的唯一">
+    <div class="question" id="questionText">你愿意和我一起奔赴浪漫吗？</div>
+    <div class="buttons">
+        <button class="btn btn-yes" id="yesBtn">💗 愿意 💗</button>
+        <button class="btn btn-no" id="noBtn">🌸 再想想 🌸</button>
+    </div>
+    <div class="message-area" id="msgArea">💞 你的回答会让星空闪烁 💞</div>
+</div>
+<div class="signature">✨ 许你漫天心动 ✨</div>
+
+<script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.128.0/build/three.module.js"
+        }
+    }
+</script>
+
+<script type="module">
+    import * as THREE from 'three';
+
+    const scene = new THREE.Scene();
+    scene.background = null;
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 0, 12);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setClearColor(0x000000, 0);
+    document.body.appendChild(renderer.domElement);
+
+    scene.fog = new THREE.FogExp2(0x0a0510, 0.008);
+
+    // 星光背景
+    const starGeometry = new THREE.BufferGeometry();
+    const starCount = 800;
+    const starPositions = new Float32Array(starCount * 3);
+    for (let i = 0; i < starCount; i++) {
+        starPositions[i*3] = (Math.random() - 0.5) * 200;
+        starPositions[i*3+1] = (Math.random() - 0.5) * 100;
+        starPositions[i*3+2] = (Math.random() - 0.5) * 50 - 30;
+    }
+    starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+    const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.12, transparent: true, opacity: 0.6 });
+    const stars = new THREE.Points(starGeometry, starMaterial);
+    scene.add(stars);
+
+    // 3D 粒子心形
+    const heartGroup = new THREE.Group();
+    const particleCount = 5500;
+    const heartGeometry = new THREE.BufferGeometry();
+
+    const positions = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
+
+    const scaleFactor = 0.23;
+    for (let i = 0; i < particleCount; i++) {
+        let t = Math.random() * Math.PI * 2;
+        let offsetStrength = 0.92 + Math.random() * 0.16;
+        let xRaw = 16 * Math.pow(Math.sin(t), 3);
+        let yRaw = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2*Math.cos(3*t) - Math.cos(4*t);
+        let randomOffsetX = (Math.random() - 0.5) * 0.7;
+        let randomOffsetY = (Math.random() - 0.5) * 0.7;
+        let x = (xRaw + randomOffsetX) * scaleFactor * offsetStrength;
+        let y = (yRaw + randomOffsetY) * scaleFactor * offsetStrength;
+        let z = (Math.random() - 0.5) * 2.4;
+
+        if (Math.random() > 0.7) {
+            x *= 0.85;
+            y *= 0.85;
+            z *= 0.7;
+        }
+
+        positions[i*3] = x;
+        positions[i*3+1] = y;
+        positions[i*3+2] = z;
+
+        let mixFactor = (y + 1.2) / 3.0;
+        mixFactor = Math.min(0.95, Math.max(0.25, mixFactor));
+        colors[i*3] = 0.95 + mixFactor * 0.3;
+        colors[i*3+1] = 0.2 + mixFactor * 0.5;
+        colors[i*3+2] = 0.25 + mixFactor * 0.4;
+    }
+
+    heartGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    heartGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    const createParticleTexture = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 32;
+        canvas.height = 32;
+        const ctx = canvas.getContext('2d');
+        ctx.beginPath();
+        ctx.arc(16, 16, 14, 0, 2 * Math.PI);
+        ctx.fillStyle = 'white';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(16, 16, 6, 0, 2 * Math.PI);
+        ctx.fillStyle = 'rgba(255,180,200,0.9)';
+        ctx.fill();
+        return new THREE.CanvasTexture(canvas);
+    };
+
+    const particleMaterial = new THREE.PointsMaterial({
+        size: 0.12,
+        vertexColors: true,
+        map: createParticleTexture(),
+        transparent: true,
+        blending: THREE.AdditiveBlending
+    });
+
+    const heartParticles = new THREE.Points(heartGeometry, particleMaterial);
+    heartGroup.add(heartParticles);
+
+    // 魔法光晕粒子
+    const glowCount = 1200;
+    const glowGeo = new THREE.BufferGeometry();
+    const glowPos = [];
+    for (let i = 0; i < glowCount; i++) {
+        const radius = 1.8 + Math.random() * 1.2;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        glowPos.push(
+            radius * Math.sin(phi) * Math.cos(theta),
+            radius * Math.sin(phi) * Math.sin(theta) * 0.9 + 0.2,
+            radius * Math.cos(phi) * 0.8
+        );
+    }
+    glowGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(glowPos), 3));
+    const glowMat = new THREE.PointsMaterial({ color: 0xff88aa, size: 0.05, transparent: true, blending: THREE.AdditiveBlending, opacity: 0.5 });
+    const glowParticles = new THREE.Points(glowGeo, glowMat);
+    heartGroup.add(glowParticles);
+
+    // 浪漫光环
+    const ringCount = 800;
+    const ringGeo = new THREE.BufferGeometry();
+    const ringPos = [];
+    for (let i = 0; i < ringCount; i++) {
+        const angle = (i / ringCount) * Math.PI * 2;
+        const rad = 2.3;
+        ringPos.push(Math.cos(angle) * rad, Math.sin(angle * 2) * 0.6, Math.sin(angle) * rad);
+    }
+    ringGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(ringPos), 3));
+    const ringMat = new THREE.PointsMaterial({ color: 0xff66aa, size: 0.07, transparent: true, blending: THREE.AdditiveBlending });
+    const ringPoints = new THREE.Points(ringGeo, ringMat);
+    heartGroup.add(ringPoints);
+
+    scene.add(heartGroup);
+
+    // 漂浮花瓣
+    const petalCount = 400;
+    const petalGeo = new THREE.BufferGeometry();
+    const petalVelocities = [];
+    const petalInitPos = [];
+    for (let i = 0; i < petalCount; i++) {
+        petalInitPos.push((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 8 + 1, (Math.random() - 0.5) * 10 - 4);
+        petalVelocities.push([(Math.random() - 0.5) * 0.005, Math.random() * 0.008 + 0.002, (Math.random() - 0.5) * 0.005]);
+    }
+    petalGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(petalInitPos), 3));
+    const petalMat = new THREE.PointsMaterial({ color: 0xff85a1, size: 0.045, transparent: true, blending: THREE.AdditiveBlending });
+    const petals = new THREE.Points(petalGeo, petalMat);
+    scene.add(petals);
+
+    const petalAttribute = petalGeo.attributes.position;
+    const petalArray = petalAttribute.array;
+
+    // UI 交互
+    const yesBtn = document.getElementById('yesBtn');
+    const noBtn = document.getElementById('noBtn');
+    const msgArea = document.getElementById('msgArea');
+    const nameInput = document.getElementById('targetName');
+    const questionText = document.getElementById('questionText');
+
+    let noClickCount = 0;
+    let isAnswered = false;
+    let heartRotationSpeed = 0.002;
+
+    function loadConfetti() {
+        return new Promise((resolve) => {
+            if (window.confetti) { resolve(window.confetti); return; }
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1';
+            script.onload = () => resolve(window.confetti);
+            document.head.appendChild(script);
+        });
+    }
+
+    let confettiFn = null;
+    loadConfetti().then(cf => { confettiFn = cf; });
+
+    function fireConfetti() {
+        if (confettiFn) {
+            confettiFn({ particleCount: 180, spread: 100, origin: { y: 0.6 }, colors: ['#ff4d6d', '#ffb3c6', '#ff85a1', '#ffd966'] });
+            confettiFn({ particleCount: 100, spread: 130, origin: { y: 0.7, x: 0.3 }, startVelocity: 15 });
+            confettiFn({ particleCount: 100, spread: 130, origin: { y: 0.7, x: 0.7 }, startVelocity: 15 });
+            setTimeout(() => {
+                confettiFn({ particleCount: 400, spread: 80, origin: { y: 0.5 }, startVelocity: 20, decay: 0.9 });
+            }, 200);
+        }
+    }
+
+    function showFinalLove() {
+        if (isAnswered) return;
+        isAnswered = true;
+        const target = nameInput.value.trim() || "我的唯一";
+        msgArea.innerHTML = `💖 你答应啦！ 💖<br>✨ 从今往后，${target} 是我宇宙里最甜的星 ✨<br>🎉 我爱你！ 🎉`;
+        questionText.innerHTML = `❤️ 我们在一起了 ❤️`;
+        yesBtn.disabled = true;
+        noBtn.disabled = true;
+        yesBtn.style.opacity = '0.6';
+        noBtn.style.opacity = '0.6';
+        fireConfetti();
+        heartRotationSpeed = 0.012;
+        document.getElementById('loveCard').style.border = '2px solid #ff99cc';
+        document.getElementById('loveCard').style.boxShadow = '0 0 70px rgba(255,80,120,0.8)';
+        createFloatingHeartsDOM();
+    }
+
+    function moveNoButton() {
+        if (isAnswered) return;
+        const btn = noBtn;
+        const btnRect = btn.getBoundingClientRect();
+        const maxX = window.innerWidth - btnRect.width - 30;
+        const maxY = window.innerHeight - btnRect.height - 60;
+        let newX = Math.random() * maxX;
+        let newY = Math.random() * maxY;
+        const cardRect = document.getElementById('loveCard').getBoundingClientRect();
+        if (Math.abs(newX - cardRect.left) < 100 && Math.abs(newY - cardRect.top) < 120) {
+            newX = (newX + 150) % maxX;
+            newY = (newY + 100) % maxY;
+        }
+        btn.style.position = 'fixed';
+        btn.style.left = `${newX}px`;
+        btn.style.top = `${newY}px`;
+        btn.style.zIndex = '30';
+        noClickCount++;
+        if (noClickCount === 3) {
+            msgArea.innerHTML = "💕 你逃不掉我的心意啦 ~ 快点击『愿意』吧 💕";
+        } else if (noClickCount === 6) {
+            msgArea.innerHTML = "🎈 再跑我就要施魔法咯！点'愿意'会超级惊喜 🎈";
+        } else if (noClickCount >= 8) {
+            msgArea.innerHTML = "❤️ 好啦好啦，不逗你了，我也愿意！❤️ 请再点一下『愿意』吧~";
+            btn.style.position = 'static';
+            btn.style.left = 'auto';
+            btn.style.top = 'auto';
+            noClickCount = 0;
+        } else {
+            msgArea.innerHTML = "🌸 别害羞嘛～ 我会一直等你 🌸";
+        }
+    }
+
+    noBtn.addEventListener('mouseenter', () => {
+        if (!isAnswered && Math.random() > 0.3) moveNoButton();
+    });
+    noBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (!isAnswered) {
+            moveNoButton();
+            if (noClickCount >= 5) {
+                msgArea.innerHTML = "💗 小傻瓜，其实你心里已经答应了对不对？点击『愿意』吧 💗";
+            }
+        }
+    });
+
+    yesBtn.addEventListener('click', () => {
+        if (isAnswered) return;
+        showFinalLove();
+    });
+
+    nameInput.addEventListener('input', (e) => {
+        if (!isAnswered) {
+            const val = e.target.value.trim() || "我的唯一";
+            questionText.innerHTML = `${val}，你愿意和我一起奔赴浪漫吗？`;
+        }
+    });
+
+    function createFloatingHeartsDOM() {
+        const container = document.getElementById('floatingHearts');
+        const emojis = ['❤️', '💖', '💗', '💘', '💝', '🌸', '✨'];
+
+        if (!document.querySelector('#heartAnimStyle')) {
+            const style = document.createElement('style');
+            style.id = 'heartAnimStyle';
+            style.textContent = `
+                @keyframes floatUp {
+                    0% { transform: translateY(0) rotate(0deg); opacity: 0.8; }
+                    100% { transform: translateY(-120vh) rotate(20deg); opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        for (let i = 0; i < 80; i++) {
+            const heart = document.createElement('div');
+            heart.innerHTML = emojis[Math.floor(Math.random() * emojis.length)];
+            heart.style.cssText = `
+                position: absolute;
+                font-size: ${Math.random() * 20 + 12}px;
+                left: ${Math.random() * 100}%;
+                bottom: -30px;
+                opacity: ${Math.random() * 0.8 + 0.4};
+                pointer-events: none;
+                animation: floatUp ${Math.random() * 4 + 3}s linear forwards;
+                z-index: 15;
+            `;
+            container.appendChild(heart);
+            setTimeout(() => heart.remove(), 5000);
+        }
+
+        if (window.heartInterval) clearInterval(window.heartInterval);
+        window.heartInterval = setInterval(() => {
+            if (!isAnswered) { clearInterval(window.heartInterval); return; }
+            const h = document.createElement('div');
+            h.innerHTML = emojis[Math.floor(Math.random() * 5)];
+            h.style.cssText = `
+                position: absolute;
+                font-size: ${Math.random() * 24 + 14}px;
+                left: ${Math.random() * 100}%;
+                bottom: -20px;
+                opacity: 0.9;
+                animation: floatUp ${Math.random() * 5 + 4}s linear forwards;
+                pointer-events: none;
+            `;
+            container.appendChild(h);
+            setTimeout(() => h.remove(), 6000);
+        }, 800);
+    }
+
+    // 初始小爱心飘浮
+    if (!document.querySelector('#heartAnimStyle')) {
+        const style = document.createElement('style');
+        style.id = 'heartAnimStyle';
+        style.textContent = `
+            @keyframes floatUp {
+                0% { transform: translateY(0) rotate(0deg); opacity: 0.8; }
+                100% { transform: translateY(-120vh) rotate(20deg); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    setTimeout(() => {
+        if (isAnswered) return;
+        const container = document.getElementById('floatingHearts');
+        for (let i = 0; i < 20; i++) {
+            setTimeout(() => {
+                const heart = document.createElement('div');
+                heart.innerHTML = '💖';
+                heart.style.cssText = `
+                    position: absolute;
+                    font-size: 16px;
+                    left: ${Math.random() * 100}%;
+                    bottom: -10px;
+                    animation: floatUp 4s linear forwards;
+                    opacity: 0.6;
+                `;
+                container.appendChild(heart);
+                setTimeout(() => heart.remove(), 4000);
+            }, i * 200);
+        }
+    }, 500);
+
+    // 动画循环
+    let time = 0;
+    function animate() {
+        requestAnimationFrame(animate);
+        time += 0.012;
+
+        heartGroup.rotation.y = Math.sin(time * 0.2) * 0.4;
+        heartGroup.rotation.x = Math.sin(time * 0.35) * 0.15;
+        heartGroup.rotation.z = Math.sin(time * 0.25) * 0.1;
+        stars.rotation.y += 0.0005;
+        stars.rotation.x += 0.0003;
+
+        for (let i = 0; i < petalCount; i++) {
+            const idx = i * 3;
+            petalArray[idx] += petalVelocities[i][0];
+            petalArray[idx+1] += petalVelocities[i][1];
+            petalArray[idx+2] += petalVelocities[i][2];
+            if (petalArray[idx+1] > 5) petalArray[idx+1] = -4;
+            if (petalArray[idx+1] < -5) petalArray[idx+1] = 4;
+            if (petalArray[idx] > 7) petalArray[idx] = -6;
+            if (petalArray[idx] < -7) petalArray[idx] = 6;
+            if (petalArray[idx+2] > 5) petalArray[idx+2] = -4;
+            if (petalArray[idx+2] < -5) petalArray[idx+2] = 4;
+        }
+        petalAttribute.needsUpdate = true;
+
+        glowParticles.rotation.y += 0.003;
+        ringPoints.rotation.x += 0.004;
+        ringPoints.rotation.z += 0.002;
+
+        camera.position.x += (0 - camera.position.x) * 0.02;
+        camera.position.y += (Math.sin(time * 0.2) * 0.03 - camera.position.y) * 0.05;
+        camera.lookAt(0, 0.2, 0);
+
+        renderer.render(scene, camera);
+    }
+
+    animate();
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    console.log("%c✨ 你打开了心动的魔法 ✨ 快点击『愿意』吧！", "color: #ff66aa; font-size: 18px; font-weight: bold;");
+</script>
+</body>
+</html>
