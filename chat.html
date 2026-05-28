@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>星穹智语 | 未来感AI聊天室</title>
+    <!-- Google Font & Font Awesome -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at 10% 20%, #0b0e1a, #04070c);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        /* 玻璃容器 */
+        .chat-app {
+            width: 1400px;
+            max-width: 100%;
+            height: 90vh;
+            min-height: 680px;
+            background: rgba(18, 25, 45, 0.65);
+            backdrop-filter: blur(20px);
+            border-radius: 2rem;
+            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid rgba(72, 187, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        /* 头部区域 */
+        .chat-header {
+            padding: 1rem 1.8rem;
+            background: rgba(10, 20, 30, 0.5);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(66, 153, 225, 0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .ai-avatar {
+            background: linear-gradient(135deg, #3b82f6, #a855f7);
+            width: 44px;
+            height: 44px;
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.6rem;
+            box-shadow: 0 8px 14px rgba(0,0,0,0.3);
+        }
+        .title h2 {
+            font-size: 1.45rem;
+            font-weight: 600;
+            background: linear-gradient(120deg, #e0f2fe, #a5f3fc);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: -0.3px;
+        }
+        .title p {
+            font-size: 0.7rem;
+            color: #8aaee0;
+        }
+        .api-config {
+            display: flex;
+            gap: 12px;
+            background: rgba(0,0,0,0.5);
+            padding: 6px 16px;
+            border-radius: 50px;
+            align-items: center;
+        }
+        .api-config input {
+            background: #1e2a3a;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 40px;
+            color: white;
+            font-size: 0.75rem;
+            width: 180px;
+            outline: none;
+            transition: 0.2s;
+        }
+        .api-config input:focus {
+            border: 1px solid #3b82f6;
+            background: #0f172a;
+        }
+        .api-config button {
+            background: #2d4a6e;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 30px;
+            color: white;
+            cursor: pointer;
+            font-size: 0.7rem;
+            font-weight: 500;
+            transition: 0.2s;
+        }
+        .api-config button:hover {
+            background: #3b82f6;
+        }
+
+        /* 聊天主体 */
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem 1.8rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            scroll-behavior: smooth;
+        }
+        /* 自定义滚动条 */
+        .chat-messages::-webkit-scrollbar {
+            width: 5px;
+        }
+        .chat-messages::-webkit-scrollbar-track {
+            background: #1a2635;
+            border-radius: 10px;
+        }
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #3b82f6;
+            border-radius: 10px;
+        }
+
+        /* 消息气泡 */
+        .message {
+            display: flex;
+            gap: 12px;
+            max-width: 85%;
+            animation: fadeSlideUp 0.25s ease;
+        }
+        .message.user {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+        .message.ai {
+            align-self: flex-start;
+        }
+        .avatar {
+            width: 36px;
+            height: 36px;
+            background: #2d3e5f;
+            border-radius: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+        .message.user .avatar {
+            background: linear-gradient(145deg, #1e2b3c, #0f212f);
+        }
+        .bubble {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(4px);
+            padding: 12px 18px;
+            border-radius: 24px;
+            border-top-left-radius: 6px;
+            color: #eef4ff;
+            font-size: 0.95rem;
+            line-height: 1.45;
+            word-break: break-word;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .message.user .bubble {
+            background: linear-gradient(135deg, #1e3a8a, #2563eb);
+            border-top-right-radius: 6px;
+            border-top-left-radius: 24px;
+            color: white;
+        }
+        .message.ai .bubble {
+            background: rgba(20, 28, 40, 0.9);
+            border-left: 3px solid #3b82f6;
+        }
+        /* 语音消息块 */
+        .voice-msg {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #1e2a3a;
+            padding: 8px 16px;
+            border-radius: 40px;
+            width: fit-content;
+        }
+        .voice-msg i {
+            font-size: 1.2rem;
+            color: #60a5fa;
+        }
+        audio {
+            height: 32px;
+            border-radius: 20px;
+        }
+        .transfer-card {
+            background: linear-gradient(145deg, #0f212e, #07121c);
+            border-radius: 28px;
+            padding: 12px 18px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border: 1px solid #facc15;
+        }
+        .typing-indicator {
+            display: flex;
+            gap: 6px;
+            padding: 10px 16px;
+            background: #1e293b;
+            width: fit-content;
+            border-radius: 30px;
+        }
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: #94a3b8;
+            border-radius: 50%;
+            animation: blink 1.4s infinite;
+        }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes blink {
+            0%,60%,100%{ opacity: 0.3; transform: scale(0.8);}
+            30%{ opacity: 1; transform: scale(1.2);}
+        }
+
+        /* 底部工具栏 */
+        .chat-input-area {
+            padding: 1rem 1.8rem 1.5rem;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(16px);
+            border-top: 1px solid rgba(59,130,246,0.3);
+        }
+        .input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #0f172ad9;
+            border-radius: 60px;
+            padding: 6px 12px 6px 20px;
+            border: 1px solid #334155;
+            transition: all 0.2s;
+        }
+        .input-wrapper:focus-within {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59,130,246,0.3);
+        }
+        .input-wrapper input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #f1f5f9;
+            font-size: 1rem;
+            padding: 12px 0;
+            outline: none;
+        }
+        .tool-btn {
+            background: none;
+            border: none;
+            color: #b9c8ff;
+            font-size: 1.5rem;
+            cursor: pointer;
+            width: 42px;
+            height: 42px;
+            border-radius: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.2s;
+        }
+        .tool-btn:hover {
+            background: #2d3e5f;
+            color: white;
+            transform: scale(1.05);
+        }
+        .send-btn {
+            background: #3b82f6;
+            color: white;
+            border-radius: 40px;
+            width: auto;
+            padding: 0 20px;
+            font-weight: 600;
+            gap: 8px;
+        }
+        .send-btn:hover {
+            background: #2563eb;
+        }
+        .emoji-picker {
+            position: absolute;
+            bottom: 80px;
+            background: #0f172ae6;
+            backdrop-filter: blur(20px);
+            border-radius: 32px;
+            padding: 12px;
+            width: 280px;
+            display: none;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+            z-index: 200;
+            border: 1px solid #3b82f6;
+        }
+        .emoji-picker span {
+            font-size: 1.6rem;
+            cursor: pointer;
+            text-align: center;
+            transition: 0.1s;
+            padding: 5px;
+        }
+        .emoji-picker span:hover {
+            background: #3b82f6;
+            border-radius: 20px;
+        }
+        /* 模态框 (通话/转账) */
+        .modal {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            visibility: hidden;
+            opacity: 0;
+            transition: 0.2s;
+        }
+        .modal.active {
+            visibility: visible;
+            opacity: 1;
+        }
+        .modal-card {
+            background: #111827e6;
+            border-radius: 2rem;
+            width: 340px;
+            padding: 1.5rem;
+            text-align: center;
+            border: 1px solid #facc15;
+            color: white;
+        }
+        .call-video {
+            background: #000;
+            border-radius: 20px;
+            height: 200px;
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #1e293b;
+        }
+        video {
+            width: 100%;
+            border-radius: 20px;
+            background: #0f172a;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+        .modal-buttons button {
+            background: #3b82f6;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 40px;
+            color: white;
+            cursor: pointer;
+        }
+        .transfer-amount {
+            background: #1e293b;
+            padding: 8px;
+            border-radius: 60px;
+            margin: 12px 0;
+        }
+        footer {
+            font-size: 0.65rem;
+            text-align: center;
+            color: #5b6e8c;
+            margin-top: 8px;
+        }
+        @keyframes fadeSlideUp {
+            from { opacity: 0; transform: translateY(12px);}
+            to { opacity: 1; transform: translateY(0);}
+        }
+        @media (max-width: 680px) {
+            .api-config input { width: 120px; }
+            .message { max-width: 95%; }
+            .tool-btn { font-size: 1.2rem; width: 38px; }
+        }
+    </style>
+</head>
+<body>
+<div class="chat-app">
+    <!-- 头部 -->
+    <div class="chat-header">
+        <div class="logo-area">
+            <div class="ai-avatar"><i class="fas fa-robot"></i></div>
+            <div class="title">
+                <h2>星穹智语 · Nexus AI</h2>
+                <p>Gemini级智能 · 实时对话伙伴</p>
+            </div>
+        </div>
+        <div class="api-config">
+            <input type="text" id="apiKeyInput" placeholder="API Key (OpenAI兼容)" value="">
+            <input type="text" id="apiUrlInput" placeholder="API URL (可选)" value="https://api.openai.com/v1/chat/completions">
+            <button id="saveApiBtn"><i class="fas fa-key"></i> 保存</button>
+        </div>
+    </div>
+
+    <!-- 聊天记录区域 -->
+    <div class="chat-messages" id="chatMessages">
+        <div class="message ai">
+            <div class="avatar"><i class="fas fa-saturn"></i></div>
+            <div class="bubble">✨ 欢迎来到星穹智语 ✨<br>我能文本对话、听懂你的语音消息，也支持转账互动和表情轰炸！<br>🔧 使用前请在上方填入 OpenAI 格式的 API Key（或使用模拟模式）</div>
+        </div>
+    </div>
+
+    <!-- 底部输入栏 -->
+    <div class="chat-input-area">
+        <div class="input-wrapper" style="position: relative;">
+            <input type="text" id="messageInput" placeholder="输入消息..." autocomplete="off">
+            <button class="tool-btn" id="emojiBtn"><i class="far fa-smile-wink"></i></button>
+            <button class="tool-btn" id="voiceRecordBtn"><i class="fas fa-microphone-alt"></i></button>
+            <button class="tool-btn" id="callBtn"><i class="fas fa-phone-alt"></i></button>
+            <button class="tool-btn" id="transferBtn"><i class="fas fa-coins"></i></button>
+            <button class="tool-btn send-btn" id="sendBtn"><i class="fas fa-paper-plane"></i> 发送</button>
+        </div>
+        <footer>🎙️ 长按录音? 单击录音5秒 → 发送语音消息 | 💎 支持转账模拟 | 📞 视频通话模拟</footer>
+    </div>
+    <!-- 表情包面板 -->
+    <div id="emojiPanel" class="emoji-picker">
+        <span>😀</span><span>😂</span><span>😍</span><span>😎</span><span>🥺</span><span>🤖</span>
+        <span>🔥</span><span>✨</span><span>❤️</span><span>🎉</span><span>🚀</span><span>💎</span>
+        <span>👍</span><span>🍻</span><span>🌈</span><span>🎶</span><span>💯</span><span>🤯</span>
+    </div>
+</div>
+
+<!-- 通话模拟模态窗 -->
+<div id="callModal" class="modal">
+    <div class="modal-card">
+        <i class="fas fa-video" style="font-size: 2rem; color:#3b82f6;"></i>
+        <h3>AI 语音/视频通话</h3>
+        <div class="call-video" id="localVideoContainer">
+            <video id="localVideo" autoplay muted playsinline style="width:100%; height:auto;"></video>
+        </div>
+        <p id="callStatus">正在连接星穹AI ...</p>
+        <div class="modal-buttons">
+            <button id="hangupCallBtn"><i class="fas fa-phone-slash"></i> 挂断</button>
+        </div>
+    </div>
+</div>
+<!-- 转账模态窗 -->
+<div id="transferModal" class="modal">
+    <div class="modal-card">
+        <i class="fas fa-hand-holding-usd" style="font-size: 2rem; color:gold;"></i>
+        <h3>向 AI 转账 ( 星穹币 )</h3>
+        <div class="transfer-amount">
+            <input type="number" id="transferAmount" placeholder="输入金额" style="background:transparent; border:1px solid #facc15; border-radius:30px; padding:8px; width:80%; color:white;">
+        </div>
+        <button id="confirmTransferBtn" style="background:#facc15; color:#0f172a; border:none; border-radius:30px; padding:8px 20px; margin:8px;">确认转账</button>
+        <div><small>模拟演示 · AI 会回复感谢信</small></div>
+        <div class="modal-buttons"><button id="closeTransferBtn">关闭</button></div>
+    </div>
+</div>
+
+<script>
+    // DOM 元素
+    const messagesContainer = document.getElementById('chatMessages');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const emojiBtn = document.getElementById('emojiBtn');
+    const emojiPanel = document.getElementById('emojiPanel');
+    const voiceRecordBtn = document.getElementById('voiceRecordBtn');
+    const callBtn = document.getElementById('callBtn');
+    const transferBtn = document.getElementById('transferBtn');
+    const callModal = document.getElementById('callModal');
+    const transferModal = document.getElementById('transferModal');
+    const saveApiBtn = document.getElementById('saveApiBtn');
+    const apiKeyInput = document.getElementById('apiKeyInput');
+    const apiUrlInput = document.getElementById('apiUrlInput');
+
+    // 状态变量
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let isRecording = false;
+    let aiTyping = false;
+    let currentStream = null;  // 通话视频流
+    let apiKey = localStorage.getItem('ai_api_key') || '';
+    let apiUrl = localStorage.getItem('ai_api_url') || 'https://api.openai.com/v1/chat/completions';
+    // 对话历史 (保留上下文)
+    let conversationHistory = [
+        { role: "system", content: "你是星穹智语AI，一位温暖风趣、知识渊博的助手。你可以处理文本、接收语音消息（说明听了录音），也支持表情和转账互动。回答得体、有创意。" }
+    ];
+
+    // 初始化输入框
+    if(apiKey) apiKeyInput.value = apiKey;
+    if(apiUrl) apiUrlInput.value = apiUrl;
+    // 保存API配置
+    saveApiBtn.addEventListener('click', () => {
+        apiKey = apiKeyInput.value.trim();
+        apiUrl = apiUrlInput.value.trim() || 'https://api.openai.com/v1/chat/completions';
+        localStorage.setItem('ai_api_key', apiKey);
+        localStorage.setItem('ai_api_url', apiUrl);
+        addSystemMessage("🔑 API配置已保存，现在可以畅聊AI了 (需有效密钥)");
+    });
+
+    // 滚动到底部
+    function scrollToBottom() { messagesContainer.scrollTop = messagesContainer.scrollHeight; }
+
+    // 添加消息 (type: 'user' or 'ai', content可以是对象或文本)
+    function addMessage(sender, contentHtmlOrText, extraClass = '') {
+        const div = document.createElement('div');
+        div.className = `message ${sender}`;
+        const avatarIcon = sender === 'user' ? '<i class="fas fa-user-astronaut"></i>' : '<i class="fas fa-brain"></i>';
+        div.innerHTML = `
+            <div class="avatar">${avatarIcon}</div>
+            <div class="bubble ${extraClass}">${contentHtmlOrText}</div>
+        `;
+        messagesContainer.appendChild(div);
+        scrollToBottom();
+    }
+
+    function addSystemMessage(text) {
+        const div = document.createElement('div');
+        div.className = `message ai`;
+        div.innerHTML = `<div class="avatar"><i class="fas fa-info-circle"></i></div><div class="bubble" style="background:#2d3748;">🔔 ${text}</div>`;
+        messagesContainer.appendChild(div);
+        scrollToBottom();
+    }
+
+    // 显示AI打字中
+    let typingIndicatorDiv = null;
+    function showTyping() {
+        if(typingIndicatorDiv) hideTyping();
+        typingIndicatorDiv = document.createElement('div');
+        typingIndicatorDiv.className = 'message ai';
+        typingIndicatorDiv.innerHTML = `<div class="avatar"><i class="fas fa-brain"></i></div><div class="bubble typing-indicator"><span></span><span></span><span></span></div>`;
+        messagesContainer.appendChild(typingIndicatorDiv);
+        scrollToBottom();
+    }
+    function hideTyping() {
+        if(typingIndicatorDiv) { typingIndicatorDiv.remove(); typingIndicatorDiv = null; }
+    }
+
+    // 调用AI API
+    async function callAI(userMessage) {
+        if(!apiKey && !apiUrl.includes('mock')) {
+            addSystemMessage("⚠️ 未配置API Key，请在上方填入有效 OpenAI 兼容的 Key 后再发送。 (或使用测试消息)");
+            return "（API未配置，我在模拟模式：你好！请配置密钥后解锁全部智能）";
+        }
+        // 添加用户消息到历史
+        conversationHistory.push({ role: "user", content: userMessage });
+        try {
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: "gpt-3.5-turbo",
+                    messages: conversationHistory,
+                    temperature: 0.8,
+                    max_tokens: 500,
+                })
+            });
+            if(!response.ok) {
+                const err = await response.text();
+                throw new Error(`API错误 ${response.status}: ${err}`);
+            }
+            const data = await response.json();
+            const reply = data.choices[0].message.content;
+            conversationHistory.push({ role: "assistant", content: reply });
+            return reply;
+        } catch(e) {
+            console.error(e);
+            addSystemMessage(`❌ AI接口调用失败: ${e.message}，可使用模拟回复。`);
+            return "✨ 星穹AI暂时离线，但光辉仍在。请检查API配置或稍后再试。 (模拟回复: 愿星辰指引你)";
+        }
+    }
+
+    // 发送文本消息流程
+    async function sendTextMessage(text) {
+        if(!text.trim()) return;
+        addMessage('user', escapeHtml(text));
+        messageInput.value = '';
+        showTyping();
+        const aiReply = await callAI(text);
+        hideTyping();
+        addMessage('ai', escapeHtml(aiReply).replace(/\n/g, '<br>'));
+    }
+
+    // 发送语音消息 (展示音频组件，并转文字给AI)
+    async function sendVoiceMessage(audioBlob) {
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audioElem = `<div class="voice-msg"><i class="fas fa-head-side-vr"></i><audio controls src="${audioUrl}"></audio><span style="font-size:0.7rem;">🎤 语音消息</span></div>`;
+        addMessage('user', audioElem, 'voice-wrapper');
+        // 使用 Web Speech API 识别 (可选) 为了提高友好，假装识别为文本或直接转文本片段
+        // 实际我们将语音转换为假想文本 (模拟智能)
+        const mockTranscript = "🎙️ 用户发送了一条语音消息，内容为：「" + (Math.random() > 0.5 ? "你好AI，我们一起聊天吧" : "语音消息，请AI回复一下") + "」";
+        addSystemMessage("🗣️ 语音识别中: 已收到您的语音~");
+        showTyping();
+        // 将语音模拟成文本发送给AI
+        const aiReply = await callAI(`[语音消息] 用户发送了一段语音，内容大意: "${mockTranscript}"。请友好回复这段语音。`);
+        hideTyping();
+        addMessage('ai', escapeHtml(aiReply));
+    }
+
+    // 录音逻辑 (简单单击录音5秒)
+    voiceRecordBtn.addEventListener('click', async () => {
+        if(isRecording) return;
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+            mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                await sendVoiceMessage(audioBlob);
+                stream.getTracks().forEach(track => track.stop());
+                isRecording = false;
+            };
+            mediaRecorder.start();
+            isRecording = true;
+            addSystemMessage("🔴 录音中... 5秒后自动发送");
+            setTimeout(() => {
+                if(mediaRecorder && mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                    addSystemMessage("✅ 语音已发送，AI正在处理");
+                }
+            }, 5000);
+        } catch(err) {
+            addSystemMessage("🎙️ 麦克风权限未开启，无法录音。");
+        }
+    });
+
+    // 表情包逻辑
+    emojiBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isVisible = emojiPanel.style.display === 'grid';
+        emojiPanel.style.display = isVisible ? 'none' : 'grid';
+    });
+    document.querySelectorAll('.emoji-picker span').forEach(emojiSpan => {
+        emojiSpan.addEventListener('click', () => {
+            const emoji = emojiSpan.innerText;
+            messageInput.value += emoji;
+            emojiPanel.style.display = 'none';
+            messageInput.focus();
+        });
+    });
+    document.addEventListener('click', (e) => {
+        if(!emojiBtn.contains(e.target) && !emojiPanel.contains(e.target)) emojiPanel.style.display = 'none';
+    });
+
+    // 转账模块
+    transferBtn.addEventListener('click', () => {
+        transferModal.classList.add('active');
+    });
+    document.getElementById('closeTransferBtn').addEventListener('click', () => transferModal.classList.remove('active'));
+    document.getElementById('confirmTransferBtn').addEventListener('click', async () => {
+        const amount = document.getElementById('transferAmount').value;
+        if(!amount || parseFloat(amount) <= 0) {
+            addSystemMessage("请输入有效金额");
+            return;
+        }
+        transferModal.classList.remove('active');
+        addMessage('user', `<div class="transfer-card"><i class="fas fa-coins"></i> 向AI转账 <strong>${amount} 星穹币</strong><i class="fas fa-arrow-right"></i> ✨</div>`);
+        showTyping();
+        const reply = await callAI(`用户向我转账了${amount}星穹币，非常慷慨！请表达感谢并送上一段星穹祝福。`);
+        hideTyping();
+        addMessage('ai', escapeHtml(reply));
+    });
+
+    // 语音/视频通话模拟 (获取本地视频)
+    let localVideo = null;
+    callBtn.addEventListener('click', async () => {
+        callModal.classList.add('active');
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            currentStream = stream;
+            const videoElem = document.getElementById('localVideo');
+            if(videoElem) {
+                videoElem.srcObject = stream;
+                videoElem.play();
+            }
+            document.getElementById('callStatus').innerHTML = "📡 已连接 AI 星穹视讯 (模拟通话中)";
+        } catch(e) {
+            document.getElementById('callStatus').innerHTML = "❌ 无法获取摄像头/麦克风，演示模式";
+        }
+    });
+    document.getElementById('hangupCallBtn').addEventListener('click', () => {
+        if(currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
+            currentStream = null;
+        }
+        callModal.classList.remove('active');
+        addSystemMessage("📞 星穹AI通话已结束，感谢连线。");
+    });
+
+    // 发送文本与Enter
+    sendBtn.addEventListener('click', () => { if(messageInput.value.trim()) sendTextMessage(messageInput.value); });
+    messageInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') sendTextMessage(messageInput.value); });
+
+    // 辅助函数转义
+    function escapeHtml(str) {
+        return str.replace(/[&<>]/g, function(m) {
+            if(m === '&') return '&amp;';
+            if(m === '<') return '&lt;';
+            if(m === '>') return '&gt;';
+            return m;
+        }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
+            return c;
+        });
+    }
+
+    // 初始化附加消息防止重复
+    window.onload = () => {
+        if(!apiKey) addSystemMessage("💡 提示: 在右上角填入 OpenAI API Key (或兼容端点) 以获得完整智能体验。若不填，AI会模拟回复但有限制。");
+    };
+</script>
+</body>
+</html>
