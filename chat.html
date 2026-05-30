@@ -6,7 +6,7 @@
     安卓适配关键：
     1. interactive-widget=resizes-content → 键盘弹出时内容缩小而非遮挡输入框
     2. 不加 viewport-fit=cover（那是 iOS 刘海用的）
-    3. viewport-fit=cover 在安卓也能用 env() safe area，但部分机型有 bug，不加更稳
+    3. 100dvh 而不是 100vh → 键盘弹出时高度动态更新
   -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
   <meta name="theme-color" content="#0d0d0d">
@@ -25,6 +25,7 @@
     :root {
       --bg: #0d0d0d;
       --surface: #1a1a1a;
+      --surface2: #222;
       --border: #2a2a2a;
       --text: #e8e8e8;
       --text-dim: #888;
@@ -32,9 +33,6 @@
       --accent-dim: #7e22ce;
       --bubble-me: #2d1b4e;
       --bubble-ai: #1a1a1a;
-      --input-bg: #1a1a1a;
-
-      /* 安卓打孔屏/刘海适配 */
       --safe-top: env(safe-area-inset-top, 0px);
       --safe-bottom: env(safe-area-inset-bottom, 0px);
     }
@@ -52,13 +50,11 @@
     #app {
       display: flex;
       flex-direction: column;
-      height: 100%;
-      /* 安卓：用 100dvh 而不是 100vh，键盘弹出时高度会动态更新 */
       height: 100dvh;
       padding-top: var(--safe-top);
     }
 
-    /* 顶栏 */
+    /* ── 顶栏 ── */
     #header {
       flex-shrink: 0;
       display: flex;
@@ -67,30 +63,79 @@
       padding: 12px 16px;
       background: var(--surface);
       border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+      touch-action: manipulation;
     }
 
-    #header-name {
+    #header-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--accent-dim);
+      display: flex;
+      align-items: center;
+      justify-content: center;
       font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    #header-info { flex: 1; }
+
+    #header-name {
+      font-size: 15px;
       font-weight: 600;
       color: var(--text);
     }
 
     #header-status {
-      font-size: 12px;
-      color: var(--text-dim);
-    }
-
-    #token-badge {
-      margin-left: auto;
       font-size: 11px;
-      color: var(--text-dim);
-      background: var(--bg);
-      padding: 3px 8px;
-      border-radius: 99px;
-      border: 1px solid var(--border);
+      color: #4ade80;
     }
 
-    /* 消息区 */
+    #header-arrow {
+      color: var(--text-dim);
+      font-size: 13px;
+      transition: transform 0.2s;
+    }
+    #header-arrow.open { transform: rotate(180deg); }
+
+    /* ── Console 面板（点顶栏展开）── */
+    #console-panel {
+      flex-shrink: 0;
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height 0.25s ease;
+    }
+    #console-panel.open { max-height: 80px; }
+
+    #console-inner {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stat-card {
+      background: var(--surface2);
+      padding: 10px 6px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .stat-label {
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+
+    /* ── 消息区 ── */
     #messages {
       flex: 1;
       overflow-y: auto;
@@ -99,7 +144,6 @@
       display: flex;
       flex-direction: column;
       gap: 12px;
-      /* 安卓滚动优化 */
       -webkit-overflow-scrolling: touch;
       overscroll-behavior-y: contain;
     }
@@ -110,9 +154,7 @@
       gap: 8px;
       max-width: 100%;
     }
-    .msg-row.me {
-      flex-direction: row-reverse;
-    }
+    .msg-row.me { flex-direction: row-reverse; }
 
     .bubble {
       max-width: 72%;
@@ -141,7 +183,25 @@
       margin-bottom: 2px;
     }
 
-    /* 输入区 */
+    .cache-badge {
+      font-size: 10px;
+      color: #22d3ee;
+      text-align: center;
+      margin-top: -6px;
+    }
+
+    /* streaming 时末尾闪烁光标 */
+    .streaming::after {
+      content: '▋';
+      animation: blink 0.7s infinite;
+      color: var(--accent);
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    /* ── 输入区 ── */
     #input-area {
       flex-shrink: 0;
       display: flex;
@@ -172,10 +232,7 @@
       -webkit-user-select: text;
       user-select: text;
     }
-
-    #input::placeholder {
-      color: var(--text-dim);
-    }
+    #input::placeholder { color: var(--text-dim); }
 
     #send-btn {
       flex-shrink: 0;
@@ -192,14 +249,9 @@
       /* 安卓：加大点击热区防误触 */
       touch-action: manipulation;
     }
-    #send-btn:active {
-      background: var(--accent);
-    }
-    #send-btn svg {
-      width: 18px;
-      height: 18px;
-      fill: white;
-    }
+    #send-btn:active { background: var(--accent); }
+    #send-btn.loading { background: #374151; }
+    #send-btn svg { width: 18px; height: 18px; fill: white; }
 
     /* typing 动画 */
     .typing-indicator {
@@ -221,24 +273,41 @@
       0%, 60%, 100% { transform: translateY(0); }
       30% { transform: translateY(-6px); }
     }
-
-    /* 缓存命中提示 */
-    .cache-hit {
-      font-size: 10px;
-      color: #6b7280;
-      text-align: center;
-      margin-top: -4px;
-    }
   </style>
 </head>
 <body>
 <div id="app">
+
+  <!-- 顶栏：点击展开 Console -->
   <div id="header">
-    <div>
+    <div id="header-avatar">✦</div>
+    <div id="header-info">
       <div id="header-name">chyunx</div>
-      <div id="header-status">在线</div>
+      <div id="header-status">● 在线</div>
     </div>
-    <div id="token-badge">tokens: <span id="token-count">0</span></div>
+    <div id="header-arrow">▾</div>
+  </div>
+
+  <!-- Console 面板 -->
+  <div id="console-panel">
+    <div id="console-inner">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-tokens">0</div>
+        <div class="stat-label">tokens</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-cost">¥0.00</div>
+        <div class="stat-label">本次花费</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-cache">—</div>
+        <div class="stat-label">缓存命中</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-msgs">0</div>
+        <div class="stat-label">消息数</div>
+      </div>
+    </div>
   </div>
 
   <div id="messages"></div>
@@ -249,66 +318,93 @@
       <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
     </button>
   </div>
-</div>
 
+</div>
 <script>
-  // ─── 配置 ───────────────────────────────────────────────
+  // ─── 配置 ────────────────────────────────────────────────────
   const CONFIG = {
-    apiKey: '',          // 填入你的 API key
+    apiKey: '',               // 填入 API key（正式部署应走后端网关，不要直接暴露）
     model: 'claude-sonnet-4-6',
-    systemPrompt: '',    // 填入 system prompt
+    systemPrompt: '',         // 填入 system prompt
     maxTokens: 1024,
+    // claude-sonnet-4-6 单价 USD/token，乘汇率换算人民币
+    PRICE: {
+      input:      3    / 1e6,
+      output:     15   / 1e6,
+      cacheWrite: 3.75 / 1e6,
+      cacheRead:  0.30 / 1e6,
+    },
+    USD_TO_CNY: 7.2,
   };
 
-  // ─── 状态 ────────────────────────────────────────────────
-  let history = [];          // 对话历史
-  let totalTokens = 0;
-  let isTyping = false;
+  // ─── 状态 ────────────────────────────────────────────────────
+  const STATE = {
+    history: [],
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
+    totalCacheReadTokens: 0,
+    totalCacheWriteTokens: 0,
+    cacheHits: 0,
+    cacheTotal: 0,
+    msgCount: 0,
+    isTyping: false,
+  };
 
-  // ─── DOM ─────────────────────────────────────────────────
-  const $msgs = document.getElementById('messages');
-  const $input = document.getElementById('input');
-  const $sendBtn = document.getElementById('send-btn');
-  const $tokenCount = document.getElementById('token-count');
+  // 从 localStorage 恢复历史
+  try {
+    const saved = localStorage.getItem('chat_history');
+    if (saved) STATE.history = JSON.parse(saved);
+  } catch {}
 
-  // ─── 注册 Service Worker ──────────────────────────────────
+  // ─── DOM ─────────────────────────────────────────────────────
+  const $msgs       = document.getElementById('messages');
+  const $input      = document.getElementById('input');
+  const $sendBtn    = document.getElementById('send-btn');
+  const $header     = document.getElementById('header');
+  const $console    = document.getElementById('console-panel');
+  const $arrow      = document.getElementById('header-arrow');
+  const $statTokens = document.getElementById('stat-tokens');
+  const $statCost   = document.getElementById('stat-cost');
+  const $statCache  = document.getElementById('stat-cache');
+  const $statMsgs   = document.getElementById('stat-msgs');
+
+  // ─── Service Worker ───────────────────────────────────────────
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   }
 
-  // ─── 工具函数 ─────────────────────────────────────────────
+  // ─── Console 展开/收起 ────────────────────────────────────────
+  $header.addEventListener('click', () => {
+    const open = $console.classList.toggle('open');
+    $arrow.classList.toggle('open', open);
+  });
+
+  // ─── 工具函数 ─────────────────────────────────────────────────
   function now() {
     return new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
   }
 
-  function addMessage(role, text, meta = {}) {
+  function renderMessage(role, text) {
     const row = document.createElement('div');
     row.className = `msg-row ${role}`;
-
-    const bubble = document.createElement('div');
-    bubble.className = 'bubble';
-    bubble.textContent = text;
 
     const time = document.createElement('div');
     time.className = 'msg-time';
     time.textContent = now();
 
-    row.appendChild(role === 'me' ? bubble : bubble);
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = text;
+
     if (role === 'me') {
+      row.appendChild(bubble);
       row.appendChild(time);
     } else {
-      row.insertBefore(time, bubble);
+      row.appendChild(time);
+      row.appendChild(bubble);
     }
 
     $msgs.appendChild(row);
-
-    if (meta.cacheHit) {
-      const hint = document.createElement('div');
-      hint.className = 'cache-hit';
-      hint.textContent = '↑ 缓存命中';
-      $msgs.appendChild(hint);
-    }
-
     $msgs.scrollTop = $msgs.scrollHeight;
     return bubble;
   }
@@ -317,10 +413,10 @@
     const row = document.createElement('div');
     row.className = 'msg-row ai';
     row.id = 'typing-row';
-    const indicator = document.createElement('div');
-    indicator.className = 'bubble typing-indicator';
-    indicator.innerHTML = '<span></span><span></span><span></span>';
-    row.appendChild(indicator);
+    const ind = document.createElement('div');
+    ind.className = 'bubble typing-indicator';
+    ind.innerHTML = '<span></span><span></span><span></span>';
+    row.appendChild(ind);
     $msgs.appendChild(row);
     $msgs.scrollTop = $msgs.scrollHeight;
   }
@@ -329,66 +425,142 @@
     document.getElementById('typing-row')?.remove();
   }
 
-  // ─── 自动调整 textarea 高度 ───────────────────────────────
+  function updateStats() {
+    const total = STATE.totalInputTokens + STATE.totalOutputTokens
+                + STATE.totalCacheReadTokens + STATE.totalCacheWriteTokens;
+    $statTokens.textContent = total > 999 ? (total / 1000).toFixed(1) + 'k' : total;
+
+    const usd = STATE.totalInputTokens  * CONFIG.PRICE.input
+              + STATE.totalOutputTokens * CONFIG.PRICE.output
+              + STATE.totalCacheReadTokens  * CONFIG.PRICE.cacheRead
+              + STATE.totalCacheWriteTokens * CONFIG.PRICE.cacheWrite;
+    const cny = usd * CONFIG.USD_TO_CNY;
+    $statCost.textContent = '¥' + (cny < 0.01 ? cny.toFixed(4) : cny.toFixed(2));
+
+    $statCache.textContent = STATE.cacheTotal > 0
+      ? Math.round(STATE.cacheHits / STATE.cacheTotal * 100) + '%'
+      : '—';
+
+    $statMsgs.textContent = STATE.msgCount;
+  }
+
+  // ─── 恢复历史消息 ─────────────────────────────────────────────
+  if (STATE.history.length) {
+    STATE.history.forEach(m => {
+      renderMessage(m.role === 'user' ? 'me' : 'ai', m.content);
+      STATE.msgCount++;
+    });
+    updateStats();
+    $msgs.scrollTop = $msgs.scrollHeight;
+  }
+
+  // ─── 自动调整 textarea 高度 ───────────────────────────────────
   $input.addEventListener('input', () => {
     $input.style.height = 'auto';
     $input.style.height = Math.min($input.scrollHeight, 120) + 'px';
   });
 
-  // ─── 发送逻辑 ─────────────────────────────────────────────
+  // ─── 发送 ─────────────────────────────────────────────────────
   async function send() {
     const text = $input.value.trim();
-    if (!text || isTyping) return;
+    if (!text || STATE.isTyping) return;
 
     $input.value = '';
     $input.style.height = 'auto';
 
-    addMessage('me', text);
-    history.push({ role: 'user', content: text });
+    renderMessage('me', text);
+    STATE.history.push({ role: 'user', content: text });
+    STATE.msgCount++;
 
-    isTyping = true;
+    STATE.isTyping = true;
+    $sendBtn.classList.add('loading');
     showTyping();
 
+    // 提前创建 AI 气泡，第一个 chunk 到了再插入 DOM
+    const aiRow = document.createElement('div');
+    aiRow.className = 'msg-row ai';
+    const aiTime = document.createElement('div');
+    aiTime.className = 'msg-time';
+    aiTime.textContent = now();
+    const aiBubble = document.createElement('div');
+    aiBubble.className = 'bubble streaming';
+    aiRow.appendChild(aiTime);
+    aiRow.appendChild(aiBubble);
+
+    let firstChunk = true;
+
     try {
-      const res = await callAPI(history);
-      hideTyping();
+      await streamAPI(STATE.history,
+        (chunk) => {
+          if (firstChunk) {
+            hideTyping();
+            $msgs.appendChild(aiRow);
+            firstChunk = false;
+          }
+          aiBubble.textContent += chunk;
+          $msgs.scrollTop = $msgs.scrollHeight;
+        },
+        (usage) => {
+          const input      = usage.input_tokens ?? 0;
+          const output     = usage.output_tokens ?? 0;
+          const cacheRead  = usage.cache_read_input_tokens ?? 0;
+          const cacheWrite = usage.cache_creation_input_tokens ?? 0;
 
-      const reply = res.content[0].text;
-      const cacheHit = !!(res.usage?.cache_read_input_tokens > 0);
-      addMessage('ai', reply, { cacheHit });
+          STATE.totalInputTokens      += input;
+          STATE.totalOutputTokens     += output;
+          STATE.totalCacheReadTokens  += cacheRead;
+          STATE.totalCacheWriteTokens += cacheWrite;
+          STATE.cacheTotal++;
+          if (cacheRead > 0) {
+            STATE.cacheHits++;
+            const badge = document.createElement('div');
+            badge.className = 'cache-badge';
+            badge.textContent = '⚡ 缓存命中';
+            $msgs.appendChild(badge);
+          }
+          STATE.msgCount++;
+          updateStats();
+        }
+      );
 
-      history.push({ role: 'assistant', content: reply });
+      aiBubble.classList.remove('streaming');
+      const reply = aiBubble.textContent;
+      STATE.history.push({ role: 'assistant', content: reply });
 
-      // token 统计
-      const used = res.usage?.input_tokens + res.usage?.output_tokens || 0;
-      totalTokens += used;
-      $tokenCount.textContent = totalTokens.toLocaleString();
+      // 持久化（只存最近 50 条，避免 localStorage 超限）
+      try {
+        localStorage.setItem('chat_history', JSON.stringify(STATE.history.slice(-50)));
+      } catch {}
 
     } catch (err) {
       hideTyping();
-      addMessage('ai', '出错了：' + err.message);
+      if (firstChunk) {
+        aiBubble.classList.remove('streaming');
+        aiBubble.textContent = '出错了：' + err.message;
+        $msgs.appendChild(aiRow);
+      }
     }
 
-    isTyping = false;
+    STATE.isTyping = false;
+    $sendBtn.classList.remove('loading');
   }
 
-  async function callAPI(messages) {
-    // 注意：直接从前端调 Claude API 会暴露 key，正式用请走自己的后端网关
+  // ─── Streaming API ────────────────────────────────────────────
+  async function streamAPI(messages, onChunk, onUsage) {
     const body = {
       model: CONFIG.model,
       max_tokens: CONFIG.maxTokens,
       messages,
+      stream: true,
     };
 
     if (CONFIG.systemPrompt) {
-      body.system = [
-        {
-          type: 'text',
-          text: CONFIG.systemPrompt,
-          // 开启 prompt caching，system prompt 不变就不重新计费
-          cache_control: { type: 'ephemeral' }
-        }
-      ];
+      // system prompt 加 cache_control，静态不变时只收 1/10 价格
+      body.system = [{
+        type: 'text',
+        text: CONFIG.systemPrompt,
+        cache_control: { type: 'ephemeral' },
+      }];
     }
 
     const r = await fetch('https://api.anthropic.com/v1/messages', {
@@ -402,15 +574,47 @@
       body: JSON.stringify(body),
     });
 
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return r.json();
+    if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`);
+
+    const reader  = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+
+      const lines = buf.split('\n');
+      buf = lines.pop() ?? '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const raw = line.slice(6).trim();
+        if (raw === '[DONE]') continue;
+        try {
+          const ev = JSON.parse(raw);
+          if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') {
+            onChunk(ev.delta.text);
+          }
+          // input tokens（含 cache 命中）在 message_start 里
+          if (ev.type === 'message_start' && ev.message?.usage) {
+            onUsage(ev.message.usage);
+          }
+          // output tokens 在 message_delta 里
+          if (ev.type === 'message_delta' && ev.usage) {
+            onUsage({ output_tokens: ev.usage.output_tokens });
+          }
+        } catch {}
+      }
+    }
   }
 
-  // ─── 事件绑定 ─────────────────────────────────────────────
+  // ─── 事件绑定 ──────────────────────────────────────────────────
   $sendBtn.addEventListener('click', send);
 
   $input.addEventListener('keydown', e => {
-    // 安卓软键盘的 Enter 是换行，不发送（composing 状态）
+    // 安卓软键盘的 Enter = 换行，不发送
     // 只有硬键盘 Enter 且没按 Shift 才发送
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       if (!('ontouchstart' in window)) {
@@ -420,7 +624,7 @@
     }
   });
 
-  // 安卓：点击消息区时收起键盘
+  // 安卓：点消息区收起键盘
   $msgs.addEventListener('touchstart', () => {
     if (document.activeElement === $input) $input.blur();
   }, { passive: true });
