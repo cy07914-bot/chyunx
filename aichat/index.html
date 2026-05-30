@@ -1,0 +1,1544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <!--
+    安卓适配：
+    interactive-widget=resizes-content → 键盘弹出时内容缩小不遮挡输入框
+    不用 viewport-fit=cover（那是 iOS 刘海专用）
+    JS 里用 100dvh 而非 100vh
+  -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
+  <meta id="meta-theme" name="theme-color" content="#1a0a2e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="manifest.json">
+  <title>chyunx</title>
+  <style>
+/* ══════════════════════════════════════════════
+   Reset & CSS 变量
+══════════════════════════════════════════════ */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0; padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root {
+  --bg1: #2d1b4e;
+  --bg2: #1a0a2e;
+  --bg-dir: 135deg;
+  --surface: rgba(255,255,255,0.07);
+  --surface-solid: #1e1030;
+  --border: rgba(255,255,255,0.12);
+  --text: #f0e6ff;
+  --text-dim: rgba(240,230,255,0.5);
+  --text-muted: rgba(240,230,255,0.22);
+  --accent: #c084fc;
+  --accent-dim: #7e22ce;
+  --accent-soft: rgba(192,132,252,0.15);
+  --bubble-me: rgba(124,58,237,0.45);
+  --bubble-ai: rgba(255,255,255,0.06);
+  --bubble-radius: 18px;
+  --avatar-shape: 50%;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  color: var(--text);
+  font-family: -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  background: linear-gradient(var(--bg-dir), var(--bg1), var(--bg2));
+}
+
+/* ══════════════════════════════════════════════
+   Screen System
+══════════════════════════════════════════════ */
+.screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding-top: var(--safe-top);
+  background: linear-gradient(var(--bg-dir), var(--bg1), var(--bg2));
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(.4,0,.2,1);
+  overflow: hidden;
+  will-change: transform;
+}
+.screen.active  { transform: translateX(0); }
+.screen.behind  { transform: translateX(-30%); }
+
+/* ══════════════════════════════════════════════
+   Common Components
+══════════════════════════════════════════════ */
+.topbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  background: rgba(0,0,0,0.25);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-title { flex: 1; font-size: 17px; font-weight: 600; }
+.back-btn {
+  font-size: 22px;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 2px 6px;
+  touch-action: manipulation;
+}
+.icon-btn {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 17px;
+  touch-action: manipulation; color: var(--text);
+}
+
+.scroll-content {
+  flex: 1;
+  overflow-y: auto; overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+input, textarea, select {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 9px 13px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  width: 100%;
+}
+input::placeholder, textarea::placeholder { color: var(--text-muted); }
+select option { background: #1e1030; }
+
+.btn {
+  padding: 10px 18px;
+  border-radius: 24px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  touch-action: manipulation;
+  transition: opacity 0.15s;
+}
+.btn:active { opacity: 0.7; }
+.btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent-dim)); color: #fff; }
+.btn-ghost   { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+
+.toggle-group { display: flex; gap: 8px; }
+.toggle-btn {
+  flex: 1; padding: 8px; border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text-dim); font-size: 13px;
+  cursor: pointer; text-align: center;
+  touch-action: manipulation; width: auto;
+}
+.toggle-btn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+/* ══════════════════════════════════════════════
+   Desktop Screen
+══════════════════════════════════════════════ */
+#screen-desktop {
+  justify-content: space-between;
+}
+#desk-top {
+  display: flex;
+  justify-content: space-between;
+  padding: 14px 20px 0;
+  font-size: 13px; color: var(--text-dim);
+}
+#desk-clock-block {
+  text-align: center;
+  padding: 32px 20px 16px;
+}
+#desk-clock {
+  font-size: 68px;
+  font-weight: 200;
+  letter-spacing: -3px;
+  color: var(--text);
+  text-shadow: 0 0 60px rgba(192,132,252,0.25);
+}
+#desk-date { font-size: 14px; color: var(--text-dim); margin-top: 4px; }
+
+#desk-apps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 8px 28px 0;
+}
+
+.app-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.app-icon-box {
+  width: 62px; height: 62px;
+  border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.35);
+  transition: transform 0.12s;
+}
+.app-icon:active .app-icon-box { transform: scale(0.88); }
+.app-icon-label {
+  font-size: 11px;
+  color: var(--text);
+  text-shadow: 0 1px 5px rgba(0,0,0,0.9);
+}
+
+#desk-dock {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  padding: 14px 24px calc(14px + var(--safe-bottom));
+  background: rgba(255,255,255,0.05);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-top: 1px solid var(--border);
+}
+
+/* ══════════════════════════════════════════════
+   Chat List Screen
+══════════════════════════════════════════════ */
+.contact-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.contact-row:active { background: var(--surface); }
+
+.cavatar {
+  width: 48px; height: 48px;
+  border-radius: var(--avatar-shape);
+  background: linear-gradient(135deg, var(--accent-dim), var(--accent));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0; overflow: hidden;
+}
+.cavatar img { width: 100%; height: 100%; object-fit: cover; }
+.cinfo { flex: 1; min-width: 0; }
+.cname { font-size: 15px; font-weight: 500; }
+.cpreview {
+  font-size: 13px; color: var(--text-dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-top: 2px;
+}
+.ctime { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
+
+/* ══════════════════════════════════════════════
+   Chat Screen
+══════════════════════════════════════════════ */
+#screen-chat { position: fixed; }
+
+#chat-bg {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+  pointer-events: none; z-index: 0; opacity: 0.25;
+}
+
+#chat-topbar { z-index: 1; position: relative; }
+
+#chat-av {
+  width: 34px; height: 34px;
+  border-radius: var(--avatar-shape);
+  background: linear-gradient(135deg, var(--accent-dim), var(--accent));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; flex-shrink: 0; overflow: hidden;
+}
+#chat-av img { width: 100%; height: 100%; object-fit: cover; }
+#chat-hinfo { flex: 1; }
+#chat-hname { font-size: 14px; font-weight: 600; }
+#chat-hsub  { font-size: 11px; color: var(--text-dim); }
+
+/* Stats bar */
+#chat-stats {
+  z-index: 1; position: relative;
+  display: flex;
+  background: rgba(0,0,0,0.3);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  max-height: 0; overflow: hidden;
+  transition: max-height 0.25s ease;
+}
+#chat-stats.open { max-height: 56px; }
+.sstat {
+  flex: 1; text-align: center;
+  padding: 8px 4px;
+  border-right: 1px solid var(--border);
+}
+.sstat:last-child { border-right: none; }
+.sstat-v { font-size: 13px; font-weight: 600; color: var(--accent); }
+.sstat-l { font-size: 10px; color: var(--text-dim); }
+
+/* Messages */
+#messages {
+  flex: 1; position: relative; z-index: 1;
+  overflow-y: auto; overflow-x: hidden;
+  padding: 10px 10px;
+  display: flex; flex-direction: column; gap: 8px;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+.mrow {
+  display: flex; align-items: flex-end; gap: 7px;
+}
+.mrow.me { flex-direction: row-reverse; }
+
+.mavatar {
+  width: 26px; height: 26px;
+  border-radius: var(--avatar-shape);
+  background: linear-gradient(135deg, var(--accent-dim), var(--accent));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; flex-shrink: 0; overflow: hidden;
+}
+.mavatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.mwrap { display: flex; flex-direction: column; max-width: 73%; }
+.mrow.me .mwrap { align-items: flex-end; }
+
+.bubble {
+  padding: 9px 13px;
+  border-radius: var(--bubble-radius);
+  word-break: break-word;
+  font-size: 15px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.mrow.ai .bubble {
+  background: var(--bubble-ai);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.mrow.me .bubble {
+  background: var(--bubble-me);
+  border-bottom-right-radius: 4px;
+  color: #f0e6ff;
+}
+
+.mtime {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 3px; padding: 0 3px;
+}
+
+/* Code blocks */
+.bubble pre {
+  background: rgba(0,0,0,0.45);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  font-size: 13px;
+  font-family: 'JetBrains Mono','Cascadia Code','Fira Code',monospace;
+  margin: 6px 0; position: relative;
+  white-space: pre;
+}
+.bubble code {
+  font-family: 'JetBrains Mono','Cascadia Code',monospace;
+  font-size: 13px;
+  background: rgba(0,0,0,0.3);
+  padding: 1px 5px; border-radius: 4px;
+}
+.bubble pre code { background: none; padding: 0; }
+.copy-btn {
+  position: absolute; top: 6px; right: 6px;
+  font-size: 11px; padding: 2px 8px;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 4px; color: var(--text-dim);
+  cursor: pointer;
+}
+
+.bubble img.mimg {
+  max-width: 100%; border-radius: 10px;
+  display: block; max-height: 200px; object-fit: contain;
+}
+
+/* Streaming cursor */
+.streaming::after {
+  content: '▋';
+  animation: blink 0.65s infinite;
+  color: var(--accent);
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* Typing dots */
+.typing-dots {
+  display: flex; gap: 4px;
+  padding: 10px 13px; align-items: center;
+}
+.typing-dots span {
+  width: 7px; height: 7px;
+  background: var(--text-dim); border-radius: 50%;
+  animation: tdot 1.2s infinite;
+}
+.typing-dots span:nth-child(2) { animation-delay: .2s; }
+.typing-dots span:nth-child(3) { animation-delay: .4s; }
+@keyframes tdot { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-5px)} }
+
+.cache-badge {
+  font-size: 10px; color: #67e8f9;
+  text-align: center;
+}
+
+/* Image preview above input */
+#img-pre {
+  display: none; position: relative; z-index: 1;
+  padding: 7px 12px 0;
+  background: rgba(0,0,0,0.2);
+  border-top: 1px solid var(--border);
+}
+#img-pre.show { display: block; }
+#img-pre img { height: 56px; border-radius: 8px; object-fit: contain; }
+#img-pre-x {
+  position: absolute; top: 3px; right: 8px;
+  background: rgba(0,0,0,0.55); border-radius: 50%;
+  width: 20px; height: 20px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; cursor: pointer; color: #fff;
+}
+
+/* Input bar */
+#input-bar {
+  flex-shrink: 0; position: relative; z-index: 1;
+  display: flex; align-items: flex-end; gap: 7px;
+  padding: 7px 10px calc(7px + var(--safe-bottom));
+  background: rgba(0,0,0,0.28);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-top: 1px solid var(--border);
+}
+#attach-btn {
+  font-size: 22px; color: var(--text-dim);
+  cursor: pointer; padding: 4px; touch-action: manipulation;
+}
+#msg-input {
+  flex: 1;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 8px 14px;
+  color: var(--text);
+  font-size: 15px; font-family: inherit;
+  resize: none; outline: none;
+  min-height: 38px; max-height: 120px;
+  overflow-y: auto; line-height: 1.45;
+  -webkit-user-select: text; user-select: text;
+}
+#msg-input::placeholder { color: var(--text-muted); }
+#send-btn {
+  width: 38px; height: 38px; flex-shrink: 0;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dim));
+  border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  touch-action: manipulation; transition: opacity 0.15s;
+}
+#send-btn:active { opacity: 0.7; }
+#send-btn.loading { background: #374151; }
+#send-btn svg { width: 16px; height: 16px; fill: white; }
+
+/* ══════════════════════════════════════════════
+   Settings Screen
+══════════════════════════════════════════════ */
+.ssec {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.ssec-title {
+  font-size: 11px; font-weight: 700;
+  color: var(--accent); letter-spacing: .06em;
+  text-transform: uppercase; margin-bottom: 12px;
+}
+.srow { margin-bottom: 11px; }
+.srow:last-child { margin-bottom: 0; }
+.slabel { font-size: 12px; color: var(--text-dim); margin-bottom: 5px; }
+.srow input, .srow textarea, .srow select { width: 100%; }
+
+.av-row { display: flex; gap: 14px; align-items: center; }
+.av-preview {
+  width: 60px; height: 60px;
+  border-radius: var(--avatar-shape);
+  background: var(--surface);
+  border: 2px dashed var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px; overflow: hidden; cursor: pointer; flex-shrink: 0;
+}
+.av-preview img { width: 100%; height: 100%; object-fit: cover; }
+
+.color-row {
+  display: flex; gap: 10px; align-items: center;
+  margin-bottom: 10px;
+}
+.color-row input[type="color"] {
+  width: 42px; height: 42px; border-radius: 10px;
+  padding: 3px; border: 1px solid var(--border);
+  cursor: pointer; flex-shrink: 0; background: none;
+}
+.color-row label { font-size: 13px; color: var(--text-dim); }
+
+/* ══════════════════════════════════════════════
+   Memory Screen
+══════════════════════════════════════════════ */
+#mem-input-area {
+  padding: 12px 14px;
+  background: rgba(0,0,0,0.2);
+  border-bottom: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 8px;
+}
+#mem-input-area textarea { min-height: 70px; max-height: 120px; resize: none; }
+
+.mem-item {
+  margin: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px; padding: 11px;
+}
+.mem-content {
+  font-size: 14px; white-space: pre-wrap; word-break: break-word;
+  max-height: 100px; overflow: hidden;
+}
+.mem-meta {
+  font-size: 11px; color: var(--text-muted);
+  margin-top: 6px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.mem-del { color: #f87171; cursor: pointer; font-size: 15px; touch-action: manipulation; }
+
+/* ══════════════════════════════════════════════
+   Modal Sheet
+══════════════════════════════════════════════ */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 200;
+  display: flex; align-items: flex-end; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.22s;
+}
+.overlay.open { opacity: 1; pointer-events: all; }
+
+.sheet {
+  width: 100%; max-width: 520px;
+  background: #1e1030;
+  border-radius: 20px 20px 0 0;
+  border-top: 1px solid var(--border);
+  padding: 14px 16px calc(16px + var(--safe-bottom));
+  transform: translateY(100%);
+  transition: transform 0.28s cubic-bezier(.4,0,.2,1);
+  max-height: 90dvh; overflow-y: auto;
+}
+.overlay.open .sheet { transform: translateY(0); }
+.sheet-handle {
+  width: 36px; height: 4px; background: var(--border);
+  border-radius: 2px; margin: 0 auto 14px;
+}
+.sheet-title { font-size: 16px; font-weight: 600; margin-bottom: 14px; }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════
+     Screen: Desktop (launcher)
+════════════════════════════════════════════ -->
+<div id="screen-desktop" class="screen active">
+  <div id="desk-top">
+    <span id="desk-loc">📍 获取位置…</span>
+    <span id="desk-signal">📶</span>
+  </div>
+
+  <div id="desk-clock-block">
+    <div id="desk-clock">00:00</div>
+    <div id="desk-date">加载中</div>
+  </div>
+
+  <div id="desk-apps">
+    <div class="app-icon" onclick="nav('chatlist')">
+      <div class="app-icon-box" style="background:linear-gradient(135deg,#7e22ce,#c084fc)">💬</div>
+      <div class="app-icon-label">聊天</div>
+    </div>
+    <div class="app-icon" onclick="nav('memory')">
+      <div class="app-icon-box" style="background:linear-gradient(135deg,#0e7490,#22d3ee)">🧠</div>
+      <div class="app-icon-label">记忆库</div>
+    </div>
+    <div class="app-icon" onclick="nav('settings')">
+      <div class="app-icon-box" style="background:linear-gradient(135deg,#7f1d1d,#f87171)">⚙️</div>
+      <div class="app-icon-label">配置</div>
+    </div>
+  </div>
+
+  <div id="desk-dock">
+    <div class="app-icon" onclick="openSheet('sheet-theme')">
+      <div class="app-icon-box" style="background:linear-gradient(135deg,#be185d,#f472b6);width:54px;height:54px;font-size:26px">🎨</div>
+      <div class="app-icon-label">主题</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     Screen: Chat List
+════════════════════════════════════════════ -->
+<div id="screen-chatlist" class="screen">
+  <div class="topbar">
+    <span class="back-btn" onclick="nav('desktop')">‹</span>
+    <span class="topbar-title">消息</span>
+    <div class="icon-btn" onclick="openSheet('sheet-add-contact')">＋</div>
+  </div>
+  <div class="scroll-content" id="contact-list"></div>
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     Screen: Chat
+════════════════════════════════════════════ -->
+<div id="screen-chat" class="screen">
+  <div id="chat-bg"></div>
+
+  <div class="topbar" id="chat-topbar">
+    <span class="back-btn" onclick="nav('chatlist')">‹</span>
+    <div id="chat-av">✦</div>
+    <div id="chat-hinfo">
+      <div id="chat-hname">—</div>
+      <div id="chat-hsub">—</div>
+    </div>
+    <div class="icon-btn" onclick="toggleStats()" title="统计">📊</div>
+    <div class="icon-btn" onclick="openSheet('sheet-chat-menu')">⋯</div>
+  </div>
+
+  <div id="chat-stats">
+    <div class="sstat"><div class="sstat-v" id="sv-tok">0</div><div class="sstat-l">tokens</div></div>
+    <div class="sstat"><div class="sstat-v" id="sv-cost">¥0.00</div><div class="sstat-l">费用</div></div>
+    <div class="sstat"><div class="sstat-v" id="sv-cache">—</div><div class="sstat-l">缓存</div></div>
+    <div class="sstat"><div class="sstat-v" id="sv-msgs">0</div><div class="sstat-l">消息</div></div>
+  </div>
+
+  <div id="messages"></div>
+
+  <div id="img-pre">
+    <img id="img-pre-img" src="" alt="">
+    <div id="img-pre-x" onclick="clearImg()">✕</div>
+  </div>
+
+  <div id="input-bar">
+    <div id="attach-btn" onclick="document.getElementById('file-in').click()">📎</div>
+    <input type="file" id="file-in" accept="image/*" style="display:none" onchange="pickImg(this)">
+    <textarea id="msg-input" placeholder="说点什么…" rows="1"></textarea>
+    <button id="send-btn" aria-label="发送" onclick="send()">
+      <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+    </button>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     Screen: Settings
+════════════════════════════════════════════ -->
+<div id="screen-settings" class="screen">
+  <div class="topbar">
+    <span class="back-btn" onclick="nav('desktop')">‹</span>
+    <span class="topbar-title">配置</span>
+    <button class="btn btn-primary" style="padding:6px 14px;font-size:13px" onclick="saveCfg()">保存</button>
+  </div>
+  <div class="scroll-content">
+
+    <div class="ssec">
+      <div class="ssec-title">API 设置</div>
+      <div class="srow"><div class="slabel">API 地址（Base URL）</div>
+        <input type="url" id="s-url" placeholder="https://api.anthropic.com"></div>
+      <div class="srow"><div class="slabel">API Key</div>
+        <input type="password" id="s-key" placeholder="sk-ant-..." autocomplete="off"></div>
+      <div class="srow"><div class="slabel">模型</div>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="s-model" placeholder="claude-sonnet-4-6" style="flex:1">
+          <button class="btn btn-ghost" style="padding:8px 12px;font-size:13px;white-space:nowrap" onclick="fetchModels()">读取列表</button>
+        </div>
+        <div id="model-dropdown" style="display:none;margin-top:6px">
+          <select id="model-sel" onchange="document.getElementById('s-model').value=this.value">
+            <option value="">— 选择 —</option>
+          </select>
+        </div>
+      </div>
+      <div class="srow"><div class="slabel">上下文自动总结（消息数阈值，0=关闭）</div>
+        <input type="number" id="s-sum" min="0" max="200" placeholder="30"></div>
+      <div class="srow"><div class="slabel">Max Tokens</div>
+        <input type="number" id="s-maxtok" min="256" max="8192" placeholder="2048"></div>
+    </div>
+
+    <div class="ssec">
+      <div class="ssec-title">System Prompt</div>
+      <textarea id="s-prompt" rows="5" placeholder="给 AI 的设定、人格…" style="min-height:90px"></textarea>
+    </div>
+
+    <div class="ssec">
+      <div class="ssec-title">我的资料</div>
+      <div class="srow"><div class="slabel">我的名字</div><input type="text" id="s-myname" placeholder="馨"></div>
+      <div class="srow">
+        <div class="slabel">我的头像</div>
+        <div class="av-row">
+          <div class="av-preview" id="my-av-prev" onclick="document.getElementById('my-av-in').click()">
+            😊<input type="file" id="my-av-in" accept="image/*" style="display:none" onchange="loadAv(this,'me')">
+          </div>
+          <div style="flex:1">
+            <div class="slabel" style="margin-bottom:6px">头像形状</div>
+            <div class="toggle-group">
+              <div class="toggle-btn" id="av-circle" onclick="setAvShape('circle')">圆形</div>
+              <div class="toggle-btn" id="av-square" onclick="setAvShape('square')">方形</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ssec">
+      <div class="ssec-title">气泡风格</div>
+      <div class="toggle-group">
+        <div class="toggle-btn" id="bub-rounded" onclick="setBubble('rounded')">大圆角</div>
+        <div class="toggle-btn" id="bub-medium"  onclick="setBubble('medium')">中圆角</div>
+        <div class="toggle-btn" id="bub-sharp"   onclick="setBubble('sharp')">直角</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     Screen: Memory Library
+════════════════════════════════════════════ -->
+<div id="screen-memory" class="screen">
+  <div class="topbar">
+    <span class="back-btn" onclick="nav('desktop')">‹</span>
+    <span class="topbar-title">记忆库</span>
+    <div class="icon-btn" onclick="clearMem()" title="清空">🗑</div>
+  </div>
+  <div id="mem-input-area">
+    <textarea id="mem-txt" placeholder="把重要信息粘贴在这里…" rows="3"></textarea>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" style="flex:1" onclick="addMemTxt()">添加</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('mem-file-in').click()">上传文件</button>
+      <input type="file" id="mem-file-in" accept=".txt,.md,.json,.csv" style="display:none" onchange="addMemFile(this)">
+    </div>
+  </div>
+  <div class="scroll-content" id="mem-list"></div>
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     Modal: Add Contact
+════════════════════════════════════════════ -->
+<div class="overlay" id="sheet-add-contact" onclick="closeSheet('sheet-add-contact')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">新建联系人</div>
+    <div class="srow"><div class="slabel">名字</div><input type="text" id="nc-name" placeholder="给这个 AI 起个名字"></div>
+    <div class="srow"><div class="slabel">头像 Emoji（可留空）</div><input type="text" id="nc-emoji" placeholder="✨" maxlength="2"></div>
+    <div class="srow"><div class="slabel">专属人设（可留空，会叠加到全局 System Prompt）</div>
+      <textarea id="nc-prompt" rows="4" placeholder="这个 AI 的性格、口吻、设定…"></textarea></div>
+    <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="addContact()">创建</button>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     Modal: Chat Menu
+════════════════════════════════════════════ -->
+<div class="overlay" id="sheet-chat-menu" onclick="closeSheet('sheet-chat-menu')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="cmenu-name">聊天选项</div>
+    <button class="btn btn-ghost" style="width:100%;margin-bottom:8px" onclick="doSummarize()">🔄 立即总结上下文</button>
+    <button class="btn btn-ghost" style="width:100%;margin-bottom:8px" onclick="clearChat()">🗑 清空聊天记录</button>
+    <button class="btn btn-ghost" style="width:100%;margin-bottom:8px" onclick="exportChat()">📤 导出聊天</button>
+    <button class="btn btn-ghost" style="width:100%;color:#f87171;border-color:#f87171" onclick="delContact()">删除联系人</button>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     Modal: Theme
+════════════════════════════════════════════ -->
+<div class="overlay" id="sheet-theme" onclick="closeSheet('sheet-theme')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">主题定制</div>
+
+    <div class="ssec-title" style="margin-bottom:10px">背景渐变</div>
+    <div class="color-row">
+      <input type="color" id="gc-start" value="#2d1b4e" oninput="previewGrad()">
+      <label>起始颜色</label>
+    </div>
+    <div class="color-row">
+      <input type="color" id="gc-end" value="#1a0a2e" oninput="previewGrad()">
+      <label>结束颜色</label>
+    </div>
+    <div class="srow" style="margin-bottom:14px">
+      <div class="slabel">渐变方向</div>
+      <div class="toggle-group">
+        <div class="toggle-btn" id="gd-135" onclick="setGradDir('135deg')">斜向</div>
+        <div class="toggle-btn" id="gd-180" onclick="setGradDir('180deg')">纵向</div>
+        <div class="toggle-btn" id="gd-90"  onclick="setGradDir('90deg')">横向</div>
+      </div>
+    </div>
+
+    <div class="ssec-title" style="margin-bottom:10px">强调色</div>
+    <div class="color-row" style="margin-bottom:14px">
+      <input type="color" id="gc-accent" value="#c084fc" oninput="previewAccent(this.value)">
+      <label>主题色</label>
+    </div>
+
+    <div class="ssec-title" style="margin-bottom:10px">聊天背景</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('chat-bg-in').click()">上传图片</button>
+      <input type="file" id="chat-bg-in" accept="image/*" style="display:none" onchange="loadChatBg(this)">
+      <button class="btn btn-ghost" onclick="clearChatBg()">清除</button>
+    </div>
+
+    <button class="btn btn-primary" style="width:100%" onclick="saveTheme();closeSheet('sheet-theme')">保存主题</button>
+  </div>
+</div>
+
+
+<script>
+/* ════════════════════════════════════════════
+   Storage
+════════════════════════════════════════════ */
+const LS = {
+  get(k, def)  { try { return JSON.parse(localStorage.getItem(k)) ?? def; } catch { return def; } },
+  set(k, v)    { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+
+/* ════════════════════════════════════════════
+   Config
+════════════════════════════════════════════ */
+const CFG = LS.get('cfg', {
+  apiUrl:   'https://api.anthropic.com',
+  apiKey:   '',
+  model:    'claude-sonnet-4-6',
+  sysPrompt:'',
+  maxTok:   2048,
+  sumThresh: 30,
+  myName:   '馨',
+  myAv:     null,
+  avShape:  'circle',
+  bubble:   'rounded',
+  grad1:    '#2d1b4e',
+  grad2:    '#1a0a2e',
+  gradDir:  '135deg',
+  accent:   '#c084fc',
+  chatBg:   null,
+});
+
+let CONTACTS = LS.get('contacts', []);
+let MEMORY   = LS.get('memory', []);
+
+let cid = null;      // current contact id
+let hist = [];       // current chat history
+let pendImg = null;  // pending image data url
+let busy = false;    // is AI typing
+
+let ST = { inp:0, out:0, cread:0, cwrite:0, chits:0, ctot:0, msgs:0 };
+
+/* ════════════════════════════════════════════
+   Screen Router
+════════════════════════════════════════════ */
+function nav(to, data) {
+  const all = document.querySelectorAll('.screen');
+  const cur = document.querySelector('.screen.active');
+  all.forEach(s => {
+    s.classList.remove('active','behind');
+    if (s === cur) s.classList.add('behind');
+  });
+  const next = document.getElementById('screen-' + to);
+  if (next) next.classList.add('active');
+
+  if (to === 'chatlist') renderContacts();
+  if (to === 'chat' && data?.cid) openContact(data.cid);
+  if (to === 'settings') loadCfgUI();
+  if (to === 'memory') renderMem();
+}
+
+/* ════════════════════════════════════════════
+   Theme
+════════════════════════════════════════════ */
+function applyTheme() {
+  const r = document.documentElement.style;
+  r.setProperty('--bg1', CFG.grad1);
+  r.setProperty('--bg2', CFG.grad2);
+  r.setProperty('--bg-dir', CFG.gradDir);
+  r.setProperty('--accent', CFG.accent);
+  r.setProperty('--accent-dim', shade(CFG.accent, 0.42));
+  r.setProperty('--accent-soft', CFG.accent + '28');
+  r.setProperty('--bubble-me', shade(CFG.accent, 0.5) + 'b0');
+  r.setProperty('--avatar-shape', CFG.avShape === 'circle' ? '50%' : '12px');
+  const bmap = { rounded:'18px', medium:'12px', sharp:'5px' };
+  r.setProperty('--bubble-radius', bmap[CFG.bubble] || '18px');
+  document.body.style.background = `linear-gradient(${CFG.gradDir},${CFG.grad1},${CFG.grad2})`;
+  document.querySelectorAll('.screen').forEach(s => {
+    s.style.background = `linear-gradient(${CFG.gradDir},${CFG.grad1},${CFG.grad2})`;
+  });
+  document.getElementById('sheet-theme').querySelector('.sheet').style.background = '#1e1030';
+  document.getElementById('chat-bg').style.backgroundImage = CFG.chatBg ? `url(${CFG.chatBg})` : 'none';
+  document.getElementById('meta-theme').content = CFG.grad1;
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1),16);
+  const f = 1 - amt;
+  return '#' + [n>>16,n>>8&0xff,n&0xff]
+    .map(x => Math.max(0,x*f|0).toString(16).padStart(2,'0')).join('');
+}
+
+function previewGrad() {
+  const s = document.getElementById('gc-start').value;
+  const e = document.getElementById('gc-end').value;
+  const dir = CFG.gradDir;
+  document.body.style.background = `linear-gradient(${dir},${s},${e})`;
+  document.querySelectorAll('.screen').forEach(el => el.style.background = `linear-gradient(${dir},${s},${e})`);
+}
+
+function previewAccent(c) {
+  document.documentElement.style.setProperty('--accent', c);
+  document.documentElement.style.setProperty('--accent-dim', shade(c,0.42));
+}
+
+function setGradDir(d) {
+  CFG.gradDir = d;
+  ['135','180','90'].forEach(v =>
+    document.getElementById('gd-'+v).classList.toggle('on', d === v+'deg'));
+  previewGrad();
+}
+
+function loadChatBg(input) {
+  const f = input.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = e => { CFG.chatBg = e.target.result; document.getElementById('chat-bg').style.backgroundImage = `url(${CFG.chatBg})`; };
+  r.readAsDataURL(f); input.value='';
+}
+function clearChatBg() { CFG.chatBg = null; document.getElementById('chat-bg').style.backgroundImage = 'none'; }
+
+function saveTheme() {
+  CFG.grad1  = document.getElementById('gc-start').value;
+  CFG.grad2  = document.getElementById('gc-end').value;
+  CFG.accent = document.getElementById('gc-accent').value;
+  LS.set('cfg', CFG); applyTheme();
+}
+
+/* ════════════════════════════════════════════
+   Desktop Clock
+════════════════════════════════════════════ */
+function tick() {
+  const d = new Date();
+  document.getElementById('desk-clock').textContent =
+    d.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('desk-date').textContent =
+    d.toLocaleDateString('zh-CN',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
+}
+tick(); setInterval(tick, 1000);
+
+if (navigator.geolocation) {
+  navigator.geolocation.getCurrentPosition(p => {
+    document.getElementById('desk-loc').textContent =
+      `📍 ${p.coords.latitude.toFixed(3)}, ${p.coords.longitude.toFixed(3)}`;
+  }, () => { document.getElementById('desk-loc').textContent = '📍 未开启定位'; });
+}
+
+/* ════════════════════════════════════════════
+   Settings UI
+════════════════════════════════════════════ */
+function loadCfgUI() {
+  document.getElementById('s-url').value   = CFG.apiUrl;
+  document.getElementById('s-key').value   = CFG.apiKey;
+  document.getElementById('s-model').value = CFG.model;
+  document.getElementById('s-prompt').value= CFG.sysPrompt;
+  document.getElementById('s-maxtok').value= CFG.maxTok;
+  document.getElementById('s-sum').value   = CFG.sumThresh;
+  document.getElementById('s-myname').value= CFG.myName;
+  if (CFG.myAv) {
+    const p = document.getElementById('my-av-prev');
+    p.innerHTML = `<img src="${CFG.myAv}"><input type="file" id="my-av-in" accept="image/*" style="display:none" onchange="loadAv(this,'me')">`;
+  }
+  ['circle','square'].forEach(v => document.getElementById('av-'+v).classList.toggle('on', CFG.avShape===v));
+  ['rounded','medium','sharp'].forEach(v => document.getElementById('bub-'+v).classList.toggle('on', CFG.bubble===v));
+}
+
+function saveCfg() {
+  CFG.apiUrl   = document.getElementById('s-url').value.trim().replace(/\/$/,'');
+  CFG.apiKey   = document.getElementById('s-key').value.trim();
+  CFG.model    = document.getElementById('s-model').value.trim();
+  CFG.sysPrompt= document.getElementById('s-prompt').value;
+  CFG.maxTok   = parseInt(document.getElementById('s-maxtok').value) || 2048;
+  CFG.sumThresh= parseInt(document.getElementById('s-sum').value) ?? 30;
+  CFG.myName   = document.getElementById('s-myname').value || '馨';
+  LS.set('cfg', CFG); applyTheme(); alert('已保存！');
+}
+
+async function fetchModels() {
+  const url = document.getElementById('s-url').value.trim().replace(/\/$/,'');
+  const key = document.getElementById('s-key').value.trim();
+  if (!url || !key) { alert('请先填 API 地址和 Key'); return; }
+  try {
+    const r = await fetch(`${url}/v1/models`, {
+      headers: { 'Authorization': `Bearer ${key}`, 'x-api-key': key }
+    });
+    const d = await r.json();
+    const models = d.data ?? d.models ?? [];
+    const sel = document.getElementById('model-sel');
+    sel.innerHTML = '<option value="">— 选择 —</option>';
+    models.forEach(m => {
+      const id = m.id ?? m.name;
+      sel.innerHTML += `<option value="${id}">${id}</option>`;
+    });
+    document.getElementById('model-dropdown').style.display = 'block';
+  } catch(e) { alert('读取失败：' + e.message); }
+}
+
+function setAvShape(s) {
+  CFG.avShape = s;
+  ['circle','square'].forEach(v => document.getElementById('av-'+v).classList.toggle('on', v===s));
+  applyTheme();
+}
+
+function setBubble(s) {
+  CFG.bubble = s;
+  ['rounded','medium','sharp'].forEach(v => document.getElementById('bub-'+v).classList.toggle('on', v===s));
+  applyTheme();
+}
+
+function loadAv(input, who) {
+  const f = input.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = e => {
+    if (who === 'me') {
+      CFG.myAv = e.target.result;
+      const p = document.getElementById('my-av-prev');
+      p.innerHTML = `<img src="${CFG.myAv}"><input type="file" id="my-av-in" accept="image/*" style="display:none" onchange="loadAv(this,'me')">`;
+    }
+  };
+  r.readAsDataURL(f);
+}
+
+/* ════════════════════════════════════════════
+   Contacts
+════════════════════════════════════════════ */
+function renderContacts() {
+  const el = document.getElementById('contact-list');
+  el.innerHTML = '';
+  if (!CONTACTS.length) {
+    el.innerHTML = '<div style="text-align:center;padding:48px 20px;color:var(--text-dim)">还没有联系人<br><small>点右上角 ＋ 添加</small></div>';
+    return;
+  }
+  CONTACTS.forEach(c => {
+    const h = LS.get('h_'+c.id, []);
+    const last = h[h.length-1];
+    const preview = last ? ((last.role==='user'?CFG.myName+'：':'')+(typeof last.content==='string'?last.content:'[图片]').slice(0,28)) : '暂无消息';
+    const t = last ? relTime(last.ts) : '';
+    const row = document.createElement('div');
+    row.className = 'contact-row';
+    row.innerHTML = `
+      <div class="cavatar">${c.av ? `<img src="${c.av}">` : (c.emoji||'✨')}</div>
+      <div class="cinfo">
+        <div class="cname">${c.name}</div>
+        <div class="cpreview">${preview}</div>
+      </div>
+      <div class="ctime">${t}</div>`;
+    row.onclick = () => nav('chat', { cid: c.id });
+    el.appendChild(row);
+  });
+}
+
+function addContact() {
+  const name = document.getElementById('nc-name').value.trim();
+  if (!name) return;
+  const c = { id: Date.now()+'', name, emoji: document.getElementById('nc-emoji').value||'✨', prompt: document.getElementById('nc-prompt').value, av: null };
+  CONTACTS.push(c); LS.set('contacts', CONTACTS);
+  closeSheet('sheet-add-contact'); renderContacts();
+}
+
+function relTime(ts) {
+  if (!ts) return '';
+  const d = Date.now() - ts;
+  if (d < 60000) return '刚刚';
+  if (d < 3600000) return (d/60000|0)+'分前';
+  if (d < 86400000) return (d/3600000|0)+'时前';
+  return (d/86400000|0)+'天前';
+}
+
+/* ════════════════════════════════════════════
+   Chat
+════════════════════════════════════════════ */
+function openContact(id) {
+  cid = id;
+  const c = CONTACTS.find(x => x.id===id); if (!c) return;
+  document.getElementById('chat-hname').textContent = c.name;
+  document.getElementById('chat-hsub').textContent  = CFG.model || 'AI';
+  const av = document.getElementById('chat-av');
+  av.innerHTML = c.av ? `<img src="${c.av}">` : (c.emoji||'✨');
+  document.getElementById('cmenu-name').textContent = c.name;
+
+  hist = LS.get('h_'+id, []);
+  ST = { inp:0, out:0, cread:0, cwrite:0, chits:0, ctot:0, msgs:0 };
+  updateStats();
+
+  const msgs = document.getElementById('messages');
+  msgs.innerHTML = '';
+  hist.forEach(m => renderMsg(m.role, m.content, m.ts, false));
+  setTimeout(() => msgs.scrollTop = msgs.scrollHeight, 50);
+}
+
+function nowStr() {
+  return new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
+}
+
+function renderMsg(role, content, ts, scroll=true) {
+  const msgs = document.getElementById('messages');
+  const isMe = role === 'user';
+  const c = CONTACTS.find(x => x.id===cid);
+
+  const row = document.createElement('div');
+  row.className = 'mrow ' + (isMe ? 'me' : 'ai');
+
+  const av = document.createElement('div');
+  av.className = 'mavatar';
+  if (isMe) av.innerHTML = CFG.myAv ? `<img src="${CFG.myAv}">` : '😊';
+  else av.innerHTML = c?.av ? `<img src="${c.av}">` : (c?.emoji||'✨');
+
+  const wrap = document.createElement('div'); wrap.className = 'mwrap';
+  const bubble = document.createElement('div'); bubble.className = 'bubble';
+  const mtime = document.createElement('div'); mtime.className = 'mtime';
+  mtime.textContent = ts ? new Date(ts).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}) : nowStr();
+
+  if (typeof content === 'string') {
+    parseMd(bubble, content);
+  } else if (Array.isArray(content)) {
+    content.forEach(part => {
+      if (part.type === 'text') parseMd(bubble, part.text);
+      else if (part.type === 'image_url') {
+        const img = document.createElement('img');
+        img.className = 'mimg'; img.src = part.image_url.url; bubble.appendChild(img);
+      } else if (part.type === 'image') {
+        const img = document.createElement('img');
+        img.className = 'mimg'; img.src = `data:${part.source.media_type};base64,${part.source.data}`;
+        bubble.appendChild(img);
+      }
+    });
+  }
+
+  wrap.appendChild(bubble); wrap.appendChild(mtime);
+  if (isMe) { row.appendChild(wrap); row.appendChild(av); }
+  else       { row.appendChild(av); row.appendChild(wrap); }
+
+  msgs.appendChild(row);
+  if (scroll) msgs.scrollTop = msgs.scrollHeight;
+  return bubble;
+}
+
+function parseMd(el, text) {
+  // Split on ```code blocks```
+  const parts = text.split(/(```[\s\S]*?```)/g);
+  parts.forEach(p => {
+    if (p.startsWith('```')) {
+      const inner = p.slice(3,-3);
+      const nl = inner.indexOf('\n');
+      const lang = nl > -1 ? inner.slice(0,nl).trim() : '';
+      const code = nl > -1 ? inner.slice(nl+1) : inner;
+      const pre = document.createElement('pre');
+      const ce = document.createElement('code');
+      ce.textContent = code;
+      const cb = document.createElement('button');
+      cb.className = 'copy-btn'; cb.textContent = '复制';
+      cb.onclick = () => navigator.clipboard.writeText(code).then(() => { cb.textContent='已复制'; setTimeout(()=>cb.textContent='复制',1500); });
+      pre.appendChild(cb); pre.appendChild(ce);
+      if (lang) pre.dataset.lang = lang;
+      el.appendChild(pre);
+    } else if (p) {
+      // inline `code`
+      const segs = p.split(/(`[^`\n]+`)/g);
+      const span = document.createElement('span');
+      segs.forEach(s => {
+        if (s.startsWith('`') && s.endsWith('`')) {
+          const c = document.createElement('code');
+          c.textContent = s.slice(1,-1); span.appendChild(c);
+        } else {
+          span.appendChild(document.createTextNode(s));
+        }
+      });
+      el.appendChild(span);
+    }
+  });
+}
+
+function showTyping() {
+  const msgs = document.getElementById('messages');
+  const c = CONTACTS.find(x=>x.id===cid);
+  const row = document.createElement('div');
+  row.className = 'mrow ai'; row.id = 'typing-row';
+  row.innerHTML = `<div class="mavatar">${c?.emoji||'✨'}</div>
+    <div class="mwrap"><div class="bubble typing-dots"><span></span><span></span><span></span></div></div>`;
+  msgs.appendChild(row); msgs.scrollTop = msgs.scrollHeight;
+}
+function hideTyping() { document.getElementById('typing-row')?.remove(); }
+
+/* image attachment */
+function pickImg(input) {
+  const f = input.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = e => {
+    pendImg = e.target.result;
+    document.getElementById('img-pre-img').src = pendImg;
+    document.getElementById('img-pre').classList.add('show');
+  };
+  r.readAsDataURL(f); input.value='';
+}
+function clearImg() {
+  pendImg = null;
+  document.getElementById('img-pre').classList.remove('show');
+  document.getElementById('img-pre-img').src = '';
+}
+
+/* ════════════════════════════════════════════
+   Send message
+════════════════════════════════════════════ */
+async function send() {
+  const inp = document.getElementById('msg-input');
+  const text = inp.value.trim();
+  if ((!text && !pendImg) || busy) return;
+  if (!CFG.apiKey) { alert('请先在配置里填入 API Key'); return; }
+
+  inp.value = ''; inp.style.height = 'auto';
+
+  // Build content
+  let content;
+  const anth = isAnth();
+  if (pendImg) {
+    const [hdr, b64] = pendImg.split(',');
+    const mt = hdr.match(/data:([^;]+)/)?.[1] || 'image/jpeg';
+    content = anth
+      ? [{ type:'image', source:{type:'base64', media_type:mt, data:b64} }, ...(text ? [{type:'text',text}] : [])]
+      : [{ type:'image_url', image_url:{url:pendImg} }, ...(text ? [{type:'text',text}] : [])];
+    clearImg();
+  } else {
+    content = text;
+  }
+
+  const ts = Date.now();
+  const userMsg = { role:'user', content, ts };
+  hist.push(userMsg);
+  renderMsg('user', content, ts);
+
+  // Auto-summarize
+  if (CFG.sumThresh > 0 && hist.length > CFG.sumThresh + 5) await autoSum();
+
+  busy = true;
+  document.getElementById('send-btn').classList.add('loading');
+  showTyping();
+
+  // Prepare AI bubble
+  const msgs = document.getElementById('messages');
+  const c = CONTACTS.find(x=>x.id===cid);
+  const aiRow = document.createElement('div'); aiRow.className = 'mrow ai';
+  const aiAv = document.createElement('div'); aiAv.className = 'mavatar';
+  aiAv.innerHTML = c?.av ? `<img src="${c.av}">` : (c?.emoji||'✨');
+  const aiWrap = document.createElement('div'); aiWrap.className = 'mwrap';
+  const aiBub = document.createElement('div'); aiBub.className = 'bubble streaming';
+  const aiT = document.createElement('div'); aiT.className = 'mtime'; aiT.textContent = nowStr();
+  aiWrap.appendChild(aiBub); aiWrap.appendChild(aiT);
+  aiRow.appendChild(aiAv); aiRow.appendChild(aiWrap);
+
+  let first = true, full = '';
+
+  try {
+    await stream(hist, c?.prompt||'',
+      chunk => {
+        if (first) { hideTyping(); msgs.appendChild(aiRow); first = false; }
+        full += chunk;
+        aiBub.textContent = full;
+        msgs.scrollTop = msgs.scrollHeight;
+      },
+      usage => {
+        ST.inp   += usage.input_tokens ?? 0;
+        ST.out   += usage.output_tokens ?? 0;
+        ST.cread += usage.cache_read_input_tokens ?? 0;
+        ST.cwrite+= usage.cache_creation_input_tokens ?? 0;
+        ST.ctot++;
+        if ((usage.cache_read_input_tokens??0) > 0) {
+          ST.chits++;
+          const b = document.createElement('div');
+          b.className = 'cache-badge'; b.textContent = '⚡ 缓存命中';
+          msgs.appendChild(b);
+        }
+        ST.msgs++; updateStats();
+      }
+    );
+
+    aiBub.classList.remove('streaming');
+    aiBub.textContent = '';
+    parseMd(aiBub, full);
+
+    hist.push({ role:'assistant', content:full, ts:Date.now() });
+    LS.set('h_'+cid, hist.slice(-120));
+
+  } catch(err) {
+    hideTyping();
+    if (first) { aiBub.classList.remove('streaming'); msgs.appendChild(aiRow); }
+    aiBub.textContent = '出错：' + err.message;
+  }
+
+  busy = false;
+  document.getElementById('send-btn').classList.remove('loading');
+}
+
+document.getElementById('msg-input').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+// Android: soft Enter = newline, hardware Enter = send
+document.getElementById('msg-input').addEventListener('keydown', e => {
+  if (e.key==='Enter' && !e.shiftKey && !e.isComposing && !('ontouchstart' in window)) {
+    e.preventDefault(); send();
+  }
+});
+
+// Tap messages → collapse keyboard
+document.getElementById('messages').addEventListener('touchstart', () => {
+  if (document.activeElement === document.getElementById('msg-input'))
+    document.getElementById('msg-input').blur();
+}, { passive: true });
+
+function toggleStats() {
+  document.getElementById('chat-stats').classList.toggle('open');
+}
+
+function updateStats() {
+  const tot = ST.inp + ST.out + ST.cread + ST.cwrite;
+  document.getElementById('sv-tok').textContent  = tot > 999 ? (tot/1000).toFixed(1)+'k' : tot;
+  const usd = ST.inp*3/1e6 + ST.out*15/1e6 + ST.cread*0.30/1e6 + ST.cwrite*3.75/1e6;
+  const cny = usd * 7.2;
+  document.getElementById('sv-cost').textContent  = '¥'+(cny<0.01?cny.toFixed(4):cny.toFixed(2));
+  document.getElementById('sv-cache').textContent = ST.ctot ? Math.round(ST.chits/ST.ctot*100)+'%' : '—';
+  document.getElementById('sv-msgs').textContent  = ST.msgs;
+}
+
+/* ════════════════════════════════════════════
+   API: streaming (Anthropic + OpenAI compatible)
+════════════════════════════════════════════ */
+function isAnth() { return CFG.apiUrl.toLowerCase().includes('anthropic'); }
+
+function buildSys(contactPrompt) {
+  const parts = [CFG.sysPrompt, contactPrompt].filter(Boolean);
+  if (MEMORY.length) parts.push('\n---\n【记忆库】\n' + MEMORY.map(m=>m.content).join('\n') + '\n---');
+  return parts.join('\n\n');
+}
+
+async function stream(messages, contactPrompt, onChunk, onUsage) {
+  const sys = buildSys(contactPrompt);
+  if (isAnth()) await streamAnth(messages, sys, onChunk, onUsage);
+  else await streamOAI(messages, sys, onChunk, onUsage);
+}
+
+async function streamAnth(messages, sys, onChunk, onUsage) {
+  const body = {
+    model: CFG.model, max_tokens: CFG.maxTok, stream: true,
+    messages: messages.map(m => ({ role:m.role, content:m.content })),
+  };
+  if (sys) body.system = [{ type:'text', text:sys, cache_control:{type:'ephemeral'} }];
+
+  const r = await fetch(CFG.apiUrl + '/v1/messages', {
+    method:'POST',
+    headers: { 'Content-Type':'application/json', 'x-api-key':CFG.apiKey,
+      'anthropic-version':'2023-06-01', 'anthropic-beta':'prompt-caching-2024-07-31' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`);
+  await sse(r, onChunk, onUsage, 'anth');
+}
+
+async function streamOAI(messages, sys, onChunk, onUsage) {
+  const msgs = sys
+    ? [{ role:'system', content:sys }, ...messages.map(m=>({ role:m.role, content:m.content }))]
+    : messages.map(m=>({ role:m.role, content:m.content }));
+  const r = await fetch(CFG.apiUrl + '/v1/chat/completions', {
+    method:'POST',
+    headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+CFG.apiKey },
+    body: JSON.stringify({ model:CFG.model, max_tokens:CFG.maxTok, stream:true, messages:msgs }),
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`);
+  await sse(r, onChunk, onUsage, 'oai');
+}
+
+async function sse(res, onChunk, onUsage, fmt) {
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream:true });
+    const lines = buf.split('\n'); buf = lines.pop() ?? '';
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const raw = line.slice(6).trim();
+      if (raw === '[DONE]') continue;
+      try {
+        const ev = JSON.parse(raw);
+        if (fmt === 'anth') {
+          if (ev.type==='content_block_delta' && ev.delta?.type==='text_delta') onChunk(ev.delta.text);
+          if (ev.type==='message_start' && ev.message?.usage) onUsage(ev.message.usage);
+          if (ev.type==='message_delta' && ev.usage) onUsage({ output_tokens: ev.usage.output_tokens });
+        } else {
+          const d = ev.choices?.[0]?.delta?.content;
+          if (d) onChunk(d);
+          if (ev.usage) onUsage({ input_tokens:ev.usage.prompt_tokens, output_tokens:ev.usage.completion_tokens });
+        }
+      } catch {}
+    }
+  }
+}
+
+/* ════════════════════════════════════════════
+   Context Summarize
+════════════════════════════════════════════ */
+async function autoSum() {
+  const toSum = hist.slice(0, -8);
+  const keep  = hist.slice(-8);
+  const prompt = '请用中文简洁总结下面对话的要点，保留重要信息：\n\n' +
+    toSum.map(m=>`${m.role==='user'?CFG.myName:'AI'}: ${typeof m.content==='string'?m.content:'[图片]'}`).join('\n');
+  let sum = '';
+  try {
+    await stream([{role:'user',content:prompt}], '', c=>{ sum+=c; }, ()=>{});
+    hist = [{ role:'assistant', content:`[以下是之前对话的摘要]\n${sum}`, ts:Date.now() }, ...keep];
+    LS.set('h_'+cid, hist);
+    addMem(sum, '对话摘要');
+  } catch {}
+}
+
+async function doSummarize() {
+  closeSheet('sheet-chat-menu');
+  if (hist.length < 4) { alert('对话太短，不需要总结'); return; }
+  await autoSum();
+  alert('已总结并保存到记忆库');
+}
+
+/* ════════════════════════════════════════════
+   Chat menu
+════════════════════════════════════════════ */
+function clearChat() {
+  hist = []; LS.set('h_'+cid, []);
+  document.getElementById('messages').innerHTML = '';
+  closeSheet('sheet-chat-menu');
+}
+
+function exportChat() {
+  const c = CONTACTS.find(x=>x.id===cid);
+  const txt = hist.map(m =>
+    `[${new Date(m.ts).toLocaleString('zh-CN')}] ${m.role==='user'?CFG.myName:c?.name}: ${typeof m.content==='string'?m.content:'[图片]'}`
+  ).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([txt],{type:'text/plain'}));
+  a.download = (c?.name||'chat')+'.txt'; a.click();
+  closeSheet('sheet-chat-menu');
+}
+
+function delContact() {
+  if (!confirm('确定删除这个联系人？')) return;
+  CONTACTS = CONTACTS.filter(x=>x.id!==cid);
+  LS.set('contacts', CONTACTS);
+  localStorage.removeItem('h_'+cid);
+  cid = null; closeSheet('sheet-chat-menu'); nav('chatlist');
+}
+
+/* ════════════════════════════════════════════
+   Memory
+════════════════════════════════════════════ */
+function renderMem() {
+  const el = document.getElementById('mem-list');
+  el.innerHTML = '';
+  if (!MEMORY.length) {
+    el.innerHTML = '<div style="text-align:center;padding:48px 20px;color:var(--text-dim)">记忆库是空的<br><small>把重要信息存在这里，聊天时 AI 会自动读取</small></div>';
+    return;
+  }
+  [...MEMORY].reverse().forEach((m,i) => {
+    const div = document.createElement('div'); div.className = 'mem-item';
+    div.innerHTML = `
+      <div class="mem-content">${m.content.slice(0,280)}${m.content.length>280?'…':''}</div>
+      <div class="mem-meta">
+        <span>${m.cat||'记忆'} · ${new Date(m.ts).toLocaleDateString('zh-CN')}</span>
+        <span class="mem-del" onclick="delMem(${MEMORY.length-1-i})">🗑</span>
+      </div>`;
+    el.appendChild(div);
+  });
+}
+
+function addMem(content, cat='记忆') {
+  MEMORY.push({ content, cat, ts:Date.now() });
+  LS.set('memory', MEMORY);
+}
+
+function addMemTxt() {
+  const t = document.getElementById('mem-txt').value.trim();
+  if (!t) return;
+  addMem(t); document.getElementById('mem-txt').value = '';
+  renderMem();
+}
+
+function addMemFile(input) {
+  const f = input.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = e => { addMem(e.target.result, f.name); renderMem(); };
+  r.readAsText(f); input.value='';
+}
+
+function delMem(i) { MEMORY.splice(i,1); LS.set('memory',MEMORY); renderMem(); }
+
+function clearMem() {
+  if (!confirm('确定清空全部记忆？')) return;
+  MEMORY = []; LS.set('memory',MEMORY); renderMem();
+}
+
+/* ════════════════════════════════════════════
+   Sheet helpers
+════════════════════════════════════════════ */
+function openSheet(id)  { document.getElementById(id).classList.add('open'); }
+function closeSheet(id) { document.getElementById(id).classList.remove('open'); }
+
+/* ════════════════════════════════════════════
+   Service Worker
+════════════════════════════════════════════ */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+
+/* Init */
+applyTheme();
+</script>
+</body>
+</html>
