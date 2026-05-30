@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <!--
+    安卓适配关键：
+    1. interactive-widget=resizes-content → 键盘弹出时内容缩小而非遮挡输入框
+    2. 不加 viewport-fit=cover（那是 iOS 刘海用的）
+    3. viewport-fit=cover 在安卓也能用 env() safe area，但部分机型有 bug，不加更稳
+  -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#0d0d0d">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="application-name" content="chyunx">
+  <link rel="manifest" href="/manifest.json">
+  <title>chyunx</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    :root {
+      --bg: #0d0d0d;
+      --surface: #1a1a1a;
+      --border: #2a2a2a;
+      --text: #e8e8e8;
+      --text-dim: #888;
+      --accent: #c084fc;
+      --accent-dim: #7e22ce;
+      --bubble-me: #2d1b4e;
+      --bubble-ai: #1a1a1a;
+      --input-bg: #1a1a1a;
+
+      /* 安卓打孔屏/刘海适配 */
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      font-size: 15px;
+      line-height: 1.55;
+    }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      /* 安卓：用 100dvh 而不是 100vh，键盘弹出时高度会动态更新 */
+      height: 100dvh;
+      padding-top: var(--safe-top);
+    }
+
+    /* 顶栏 */
+    #header {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+
+    #header-name {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    #header-status {
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    #token-badge {
+      margin-left: auto;
+      font-size: 11px;
+      color: var(--text-dim);
+      background: var(--bg);
+      padding: 3px 8px;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+    }
+
+    /* 消息区 */
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      /* 安卓滚动优化 */
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: contain;
+    }
+
+    .msg-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      max-width: 100%;
+    }
+    .msg-row.me {
+      flex-direction: row-reverse;
+    }
+
+    .bubble {
+      max-width: 72%;
+      padding: 10px 14px;
+      border-radius: 18px;
+      word-break: break-word;
+      white-space: pre-wrap;
+      font-size: 15px;
+    }
+    .msg-row.ai .bubble {
+      background: var(--bubble-ai);
+      border: 1px solid var(--border);
+      border-bottom-left-radius: 4px;
+      color: var(--text);
+    }
+    .msg-row.me .bubble {
+      background: var(--bubble-me);
+      border-bottom-right-radius: 4px;
+      color: #e0c8ff;
+    }
+
+    .msg-time {
+      font-size: 11px;
+      color: var(--text-dim);
+      flex-shrink: 0;
+      margin-bottom: 2px;
+    }
+
+    /* 输入区 */
+    #input-area {
+      flex-shrink: 0;
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      padding: 10px 12px;
+      padding-bottom: calc(10px + var(--safe-bottom));
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+    }
+
+    #input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 10px 16px;
+      color: var(--text);
+      font-size: 15px;
+      font-family: inherit;
+      resize: none;
+      outline: none;
+      min-height: 42px;
+      max-height: 120px;
+      overflow-y: auto;
+      line-height: 1.5;
+      /* 安卓：防止长按选中时触发系统菜单遮挡输入框 */
+      -webkit-user-select: text;
+      user-select: text;
+    }
+
+    #input::placeholder {
+      color: var(--text-dim);
+    }
+
+    #send-btn {
+      flex-shrink: 0;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: var(--accent-dim);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+      /* 安卓：加大点击热区防误触 */
+      touch-action: manipulation;
+    }
+    #send-btn:active {
+      background: var(--accent);
+    }
+    #send-btn svg {
+      width: 18px;
+      height: 18px;
+      fill: white;
+    }
+
+    /* typing 动画 */
+    .typing-indicator {
+      display: flex;
+      gap: 4px;
+      padding: 12px 14px;
+    }
+    .typing-indicator span {
+      width: 7px;
+      height: 7px;
+      background: var(--text-dim);
+      border-radius: 50%;
+      animation: bounce 1.2s infinite;
+    }
+    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes bounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-6px); }
+    }
+
+    /* 缓存命中提示 */
+    .cache-hit {
+      font-size: 10px;
+      color: #6b7280;
+      text-align: center;
+      margin-top: -4px;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <div>
+      <div id="header-name">chyunx</div>
+      <div id="header-status">在线</div>
+    </div>
+    <div id="token-badge">tokens: <span id="token-count">0</span></div>
+  </div>
+
+  <div id="messages"></div>
+
+  <div id="input-area">
+    <textarea id="input" placeholder="说点什么…" rows="1"></textarea>
+    <button id="send-btn" aria-label="发送">
+      <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+  // ─── 配置 ───────────────────────────────────────────────
+  const CONFIG = {
+    apiKey: '',          // 填入你的 API key
+    model: 'claude-sonnet-4-6',
+    systemPrompt: '',    // 填入 system prompt
+    maxTokens: 1024,
+  };
+
+  // ─── 状态 ────────────────────────────────────────────────
+  let history = [];          // 对话历史
+  let totalTokens = 0;
+  let isTyping = false;
+
+  // ─── DOM ─────────────────────────────────────────────────
+  const $msgs = document.getElementById('messages');
+  const $input = document.getElementById('input');
+  const $sendBtn = document.getElementById('send-btn');
+  const $tokenCount = document.getElementById('token-count');
+
+  // ─── 注册 Service Worker ──────────────────────────────────
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
+
+  // ─── 工具函数 ─────────────────────────────────────────────
+  function now() {
+    return new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function addMessage(role, text, meta = {}) {
+    const row = document.createElement('div');
+    row.className = `msg-row ${role}`;
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = text;
+
+    const time = document.createElement('div');
+    time.className = 'msg-time';
+    time.textContent = now();
+
+    row.appendChild(role === 'me' ? bubble : bubble);
+    if (role === 'me') {
+      row.appendChild(time);
+    } else {
+      row.insertBefore(time, bubble);
+    }
+
+    $msgs.appendChild(row);
+
+    if (meta.cacheHit) {
+      const hint = document.createElement('div');
+      hint.className = 'cache-hit';
+      hint.textContent = '↑ 缓存命中';
+      $msgs.appendChild(hint);
+    }
+
+    $msgs.scrollTop = $msgs.scrollHeight;
+    return bubble;
+  }
+
+  function showTyping() {
+    const row = document.createElement('div');
+    row.className = 'msg-row ai';
+    row.id = 'typing-row';
+    const indicator = document.createElement('div');
+    indicator.className = 'bubble typing-indicator';
+    indicator.innerHTML = '<span></span><span></span><span></span>';
+    row.appendChild(indicator);
+    $msgs.appendChild(row);
+    $msgs.scrollTop = $msgs.scrollHeight;
+  }
+
+  function hideTyping() {
+    document.getElementById('typing-row')?.remove();
+  }
+
+  // ─── 自动调整 textarea 高度 ───────────────────────────────
+  $input.addEventListener('input', () => {
+    $input.style.height = 'auto';
+    $input.style.height = Math.min($input.scrollHeight, 120) + 'px';
+  });
+
+  // ─── 发送逻辑 ─────────────────────────────────────────────
+  async function send() {
+    const text = $input.value.trim();
+    if (!text || isTyping) return;
+
+    $input.value = '';
+    $input.style.height = 'auto';
+
+    addMessage('me', text);
+    history.push({ role: 'user', content: text });
+
+    isTyping = true;
+    showTyping();
+
+    try {
+      const res = await callAPI(history);
+      hideTyping();
+
+      const reply = res.content[0].text;
+      const cacheHit = !!(res.usage?.cache_read_input_tokens > 0);
+      addMessage('ai', reply, { cacheHit });
+
+      history.push({ role: 'assistant', content: reply });
+
+      // token 统计
+      const used = res.usage?.input_tokens + res.usage?.output_tokens || 0;
+      totalTokens += used;
+      $tokenCount.textContent = totalTokens.toLocaleString();
+
+    } catch (err) {
+      hideTyping();
+      addMessage('ai', '出错了：' + err.message);
+    }
+
+    isTyping = false;
+  }
+
+  async function callAPI(messages) {
+    // 注意：直接从前端调 Claude API 会暴露 key，正式用请走自己的后端网关
+    const body = {
+      model: CONFIG.model,
+      max_tokens: CONFIG.maxTokens,
+      messages,
+    };
+
+    if (CONFIG.systemPrompt) {
+      body.system = [
+        {
+          type: 'text',
+          text: CONFIG.systemPrompt,
+          // 开启 prompt caching，system prompt 不变就不重新计费
+          cache_control: { type: 'ephemeral' }
+        }
+      ];
+    }
+
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': CONFIG.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'prompt-caching-2024-07-31',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  }
+
+  // ─── 事件绑定 ─────────────────────────────────────────────
+  $sendBtn.addEventListener('click', send);
+
+  $input.addEventListener('keydown', e => {
+    // 安卓软键盘的 Enter 是换行，不发送（composing 状态）
+    // 只有硬键盘 Enter 且没按 Shift 才发送
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      if (!('ontouchstart' in window)) {
+        e.preventDefault();
+        send();
+      }
+    }
+  });
+
+  // 安卓：点击消息区时收起键盘
+  $msgs.addEventListener('touchstart', () => {
+    if (document.activeElement === $input) $input.blur();
+  }, { passive: true });
+</script>
+</body>
+</html>
